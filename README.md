@@ -22,7 +22,8 @@
 8. [Developer Quick Start & Engineering Handbook](#8-developer-quick-start--engineering-handbook)
 9. [REST API Contract & Integration Reference](#9-rest-api-contract--integration-reference)
 10. [Health Economics & Abu Dhabi IFHAS Pilot Plan](#10-health-economics--abu-dhabi-ifhas-pilot-plan)
-11. [Repository Map & Documentation Index](#11-repository-map--documentation-index)
+11. [Investor Pitch, Unit Economics & 10-Slide Deck](#11-investor-pitch-unit-economics--10-slide-deck)
+12. [Repository Map & Documentation Index](#12-repository-map--documentation-index)
 
 ---
 
@@ -278,7 +279,24 @@ All endpoints return strictly typed JSON schemas:
 
 ---
 
-## 11. Repository Map & Documentation Index
+## 11. Investor Pitch, Unit Economics & 10-Slide Deck
+
+For venture capital, deep-tech, and sovereign healthcare investors (DoH Abu Dhabi / Mubadala / ADQ), see our complete investor memo in [`docs/INVESTOR_PITCH_AND_DECK.md`](docs/INVESTOR_PITCH_AND_DECK.md):
+
+* **The 90-Second Word-for-Word Pitch:** Memorized narrative focusing on specialist bottlenecks, payer costs, and the B2B2G distribution wedge.
+* **The 3-Minute Live Demo Walkthrough (Exact Clickpath):**
+  1. *Fatima Al-Ali:* The Anti-Bias Personal Baseline Moat.
+  2. *Tariq Al-Nuaimi:* Context-Aware Noise Filtering (saving $400+ consults on sleep dips).
+  3. *Layla Al-Mansoori:* 60-Second Clinician Triage & Reversible-Cause Gate.
+  4. *Omar Al-Husseini:* Deterministic Red-Flag Safety Gate (100% emergency bypass, zero hallucinations).
+  5. *Admin Dashboard:* 2,000-subject synthetic validation & unit-economic proof.
+* **Tough Investor Q&A:** Defensible answers covering SaMD non-diagnostic positioning, user retention via family loops and payer mandates, B2B2G SaaS pricing ($12–$18 PEPY), and competitive moats against Big Tech/EHRs.
+* **10-Slide Pitch Deck Master Outline:** Complete slide-by-slide structure with visuals, metrics, and narrative script.
+* **Market Sizing:** TAM ($14.2B global), SAM ($1.8B GCC/MENA), SOM ($120M UAE preventive screening cohort).
+
+---
+
+## 12. Repository Map & Documentation Index
 
 ```text
 brainbaseline-cdss/
@@ -290,6 +308,8 @@ brainbaseline-cdss/
 │   ├── function_items.json         # 8 daily function items
 │   └── triage_rules.json           # Pop priors, thresholds, banned diagnostic words
 ├── docs/
+│   ├── DEVELOPER_GUIDE.md          # Comprehensive Developer Onboarding Handbook
+│   ├── INVESTOR_PITCH_AND_DECK.md  # 90s Pitch, 10-Slide Deck, Investor Q&A & Unit Economics
 │   ├── TECHNICAL_ARCHITECTURE.md   # Mathematical equations, CUSUM, & 5-gate pipeline
 │   ├── LIMITATIONS_AND_SAFETY.md   # Non-diagnostic boundaries, banned words, disclaimers
 │   └── PILOT_PLAN.md               # Abu Dhabi primary-care & IFHAS routine screening plan
