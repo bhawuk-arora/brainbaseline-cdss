@@ -1,0 +1,36 @@
+{
+  "domains": {
+    "memory": {"pop_mean": 13.0, "pop_sd": 1.8, "reliability": 0.82, "safety_floor": 7.0},
+    "sequence_av": {"pop_mean": 11.5, "pop_sd": 2.0, "reliability": 0.85, "safety_floor": 5.0},
+    "attention_rt": {"pop_mean": 52.0, "pop_sd": 6.5, "reliability": 0.84, "safety_floor": 25.0}
+  },
+  "shrinkage_k": 4,
+  "thresholds": {
+    "yellow_z": -1.5,
+    "red_single_z": -2.5,
+    "rci_cutoff": -1.96,
+    "cusum_k": 0.5,
+    "cusum_h": 4.0,
+    "min_sleep_hours": 5.0
+  },
+  "reversible_causes": [
+    {"id": "rc1", "en": "Low mood, grief, or untreated anxiety", "ar": "انخفاض المزاج أو القلق غير المعالج"},
+    {"id": "rc2", "en": "Sleep disruption or obstructive sleep apnea", "ar": "اضطراب النوم أو انقطاع النفس أثناء النوم"},
+    {"id": "rc3", "en": "Anticholinergic, sedative, or new prescription medications", "ar": "الأدوية المهدئة أو مضادات الكولين أو الأدوية الجديدة"},
+    {"id": "rc4", "en": "Uncorrected hearing or vision impairment", "ar": "ضعف السمع أو البصر غير المصحح"},
+    {"id": "rc5", "en": "Vitamin B12 deficiency, thyroid dysfunction, or anemia", "ar": "نقص فيتامين ب12 أو اضطراب الغدة الدرقية أو فقر الدم"},
+    {"id": "rc6", "en": "Uncontrolled blood glucose, electrolytes, or dehydration", "ar": "عدم انتظام السكر أو الأملاح أو الجفاف"}
+  ],
+  "plan_actions": [
+    {"id": "act_sleep", "trigger": "poor_sleep", "en": "Keep a consistent 7–8 hour sleep schedule and avoid late caffeine.", "ar": "حافظ على جدول نوم منتظم لمدة 7-8 ساعات وتجنب الكافيين مساءً."},
+    {"id": "act_walk", "trigger": "physical_inactivity", "en": "Aim for 30 minutes of brisk walking 5 days a week.", "ar": "مارس المشي السريع لمدة 30 دقيقة 5 أيام في الأسبوع."},
+    {"id": "act_bp", "trigger": "hypertension", "en": "Review blood pressure and blood sugar targets at your next primary-care visit.", "ar": "راجع قراءات ضغط الدم والسكر في زيارتك القادمة للرعاية الأولية."},
+    {"id": "act_sensory", "trigger": "hearing_loss", "en": "Schedule a routine hearing and vision check-up.", "ar": "احجز موعداً لفحص السمع والنظر الدوري."},
+    {"id": "act_social", "trigger": "default", "en": "Stay socially connected and engage in mentally stimulating conversations or puzzles.", "ar": "حافظ على التواصل الاجتماعي والأنشطة الذهنية المحفزة."}
+  ],
+  "banned_diagnostic_words": [
+    "alzheimer", "alzheimer's", "dementia", "diagnosed", "diagnosis",
+    "mci", "mild cognitive impairment", "neurodegenerative", "senile",
+    "خرف", "زهايمر", "تشخيص", "مرض عقلي"
+  ]
+}

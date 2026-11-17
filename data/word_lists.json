@@ -1,0 +1,92 @@
+{
+  "forms": {
+    "A": {
+      "targets": [
+        {"id": "w1", "en": "Bridge", "ar": "جسر"},
+        {"id": "w2", "en": "Lantern", "ar": "فانوس"},
+        {"id": "w3", "en": "Olive", "ar": "زيتون"},
+        {"id": "w4", "en": "Compass", "ar": "بوصلة"},
+        {"id": "w5", "en": "Harbor", "ar": "ميناء"},
+        {"id": "w6", "en": "Feather", "ar": "ريشة"},
+        {"id": "w7", "en": "Kettle", "ar": "إبريق"},
+        {"id": "w8", "en": "Garden", "ar": "حديقة"}
+      ],
+      "distractors": [
+        {"id": "d1", "en": "Window", "ar": "نافذة"},
+        {"id": "d2", "en": "Anchor", "ar": "مرساة"},
+        {"id": "d3", "en": "Pebble", "ar": "حصاة"},
+        {"id": "d4", "en": "Basket", "ar": "سلة"},
+        {"id": "d5", "en": "Mirror", "ar": "مرآة"},
+        {"id": "d6", "en": "Candle", "ar": "شمعة"},
+        {"id": "d7", "en": "Desert", "ar": "صحراء"},
+        {"id": "d8", "en": "Needle", "ar": "إبرة"}
+      ]
+    },
+    "B": {
+      "targets": [
+        {"id": "w9", "en": "Fountain", "ar": "نافورة"},
+        {"id": "w10", "en": "Carpet", "ar": "سجادة"},
+        {"id": "w11", "en": "Almond", "ar": "لوز"},
+        {"id": "w12", "en": "Pillow", "ar": "وسادة"},
+        {"id": "w13", "en": "Valley", "ar": "وادي"},
+        {"id": "w14", "en": "Hammer", "ar": "مطرقة"},
+        {"id": "w15", "en": "Cloud", "ar": "سحابة"},
+        {"id": "w16", "en": "Saddle", "ar": "سرج"}
+      ],
+      "distractors": [
+        {"id": "d9", "en": "Ladder", "ar": "سلم"},
+        {"id": "d10", "en": "Ribbon", "ar": "شريط"},
+        {"id": "d11", "en": "Falcon", "ar": "صقر"},
+        {"id": "d12", "en": "Bucket", "ar": "دلو"},
+        {"id": "d13", "en": "Orchard", "ar": "بستان"},
+        {"id": "d14", "en": "Button", "ar": "زر"},
+        {"id": "d15", "en": "Island", "ar": "جزيرة"},
+        {"id": "d16", "en": "Blanket", "ar": "بطانية"}
+      ]
+    },
+    "C": {
+      "targets": [
+        {"id": "w17", "en": "Tower", "ar": "برج"},
+        {"id": "w18", "en": "Saffron", "ar": "زعفران"},
+        {"id": "w19", "en": "Camel", "ar": "جمل"},
+        {"id": "w20", "en": "Key", "ar": "مفتاح"},
+        {"id": "w21", "en": "River", "ar": "نهر"},
+        {"id": "w22", "en": "Wheel", "ar": "عجلة"},
+        {"id": "w23", "en": "Pearl", "ar": "لؤلؤة"},
+        {"id": "w24", "en": "Door", "ar": "باب"}
+      ],
+      "distractors": [
+        {"id": "d17", "en": "Mountain", "ar": "جبل"},
+        {"id": "d18", "en": "Honey", "ar": "عسل"},
+        {"id": "d19", "en": "Tent", "ar": "خيمة"},
+        {"id": "d20", "en": "Clock", "ar": "ساعة"},
+        {"id": "d21", "en": "Star", "ar": "نجمة"},
+        {"id": "d22", "en": "Spoon", "ar": "ملعقة"},
+        {"id": "d23", "en": "Boat", "ar": "قارب"},
+        {"id": "d24", "en": "Book", "ar": "كتاب"}
+      ]
+    },
+    "D": {
+      "targets": [
+        {"id": "w25", "en": "Palm", "ar": "نخلة"},
+        {"id": "w26", "en": "Shell", "ar": "صدفة"},
+        {"id": "w27", "en": "Bell", "ar": "جرس"},
+        {"id": "w28", "en": "Thread", "ar": "خيط"},
+        {"id": "w29", "en": "Oasis", "ar": "واحة"},
+        {"id": "w30", "en": "Plate", "ar": "طبق"},
+        {"id": "w31", "en": "Stone", "ar": "حجر"},
+        {"id": "w32", "en": "Lamp", "ar": "مصباح"}
+      ],
+      "distractors": [
+        {"id": "d25", "en": "Wall", "ar": "جدار"},
+        {"id": "d26", "en": "Silver", "ar": "فضة"},
+        {"id": "d27", "en": "Rope", "ar": "حبل"},
+        {"id": "d28", "en": "Bread", "ar": "خبز"},
+        {"id": "d29", "en": "Wind", "ar": "ريح"},
+        {"id": "d30", "en": "Cup", "ar": "كوب"},
+        {"id": "d31", "en": "Tree", "ar": "شجرة"},
+        {"id": "d32", "en": "Paper", "ar": "ورقة"}
+      ]
+    }
+  }
+}

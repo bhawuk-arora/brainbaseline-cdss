@@ -1,0 +1,108 @@
+{
+  "benchmark_summary": {
+    "cohort_size": 2000,
+    "sensitivity": 1.0,
+    "specificity": 1.0,
+    "false_referral_per_100_stable_per_year": 0.0,
+    "median_weeks_to_flag": 16.0,
+    "red_flag_emergency_gate_accuracy": 1.0,
+    "red_flag_cases_tested": 50,
+    "red_flag_cases_detected": 50
+  },
+  "trajectory_breakdown": {
+    "stable": {
+      "total": 1405,
+      "flagged": 0,
+      "rate": 0.0
+    },
+    "slow_decline": {
+      "total": 152,
+      "flagged": 152,
+      "rate": 1.0
+    },
+    "fast_decline": {
+      "total": 40,
+      "flagged": 40,
+      "rate": 1.0
+    },
+    "sleep_mood_dip": {
+      "total": 235,
+      "flagged": 9,
+      "rate": 0.0383
+    },
+    "practice_only": {
+      "total": 124,
+      "flagged": 0,
+      "rate": 0.0
+    },
+    "irregular": {
+      "total": 44,
+      "flagged": 1,
+      "rate": 0.0227
+    }
+  },
+  "ablation_comparison": {
+    "personal_baseline": {
+      "method": "BrainBaseline Within-Person Shrinkage Engine",
+      "false_positive_rate": 0.0,
+      "specificity": 1.0
+    },
+    "population_norm_cutoff": {
+      "method": "Static Population-Norm Cutoff (-1.5 SD)",
+      "false_positive_rate": 0.3283,
+      "specificity": 0.6717
+    },
+    "avoided_false_positive_referrals_per_10k": 2955,
+    "estimated_savings_aed": 3546000
+  },
+  "subgroup_fairness": {
+    "lang_ar": {
+      "sensitivity": 1.0,
+      "false_positive_rate": 0.0066,
+      "n_stable": 911,
+      "n_decline": 94
+    },
+    "edu_low": {
+      "sensitivity": 1.0,
+      "false_positive_rate": 0.0209,
+      "n_stable": 431,
+      "n_decline": 46
+    },
+    "age_40-54": {
+      "sensitivity": 1.0,
+      "false_positive_rate": 0.0063,
+      "n_stable": 634,
+      "n_decline": 68
+    },
+    "lang_en": {
+      "sensitivity": 1.0,
+      "false_positive_rate": 0.0045,
+      "n_stable": 897,
+      "n_decline": 98
+    },
+    "edu_high": {
+      "sensitivity": 1.0,
+      "false_positive_rate": 0.0,
+      "n_stable": 424,
+      "n_decline": 46
+    },
+    "age_55-69": {
+      "sensitivity": 1.0,
+      "false_positive_rate": 0.0063,
+      "n_stable": 798,
+      "n_decline": 83
+    },
+    "edu_mid": {
+      "sensitivity": 1.0,
+      "false_positive_rate": 0.001,
+      "n_stable": 953,
+      "n_decline": 100
+    },
+    "age_70+": {
+      "sensitivity": 1.0,
+      "false_positive_rate": 0.0027,
+      "n_stable": 376,
+      "n_decline": 41
+    }
+  }
+}

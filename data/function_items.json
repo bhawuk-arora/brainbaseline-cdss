@@ -1,0 +1,18 @@
+{
+  "scale": [
+    {"value": 0, "en": "No change", "ar": "لا يوجد تغيير"},
+    {"value": 1, "en": "A little harder than a year ago", "ar": "أصعب قليلاً مقارنة بالعام الماضي"},
+    {"value": 2, "en": "Much harder than a year ago", "ar": "أصعب بكثير مقارنة بالعام الماضي"}
+  ],
+  "worse_threshold": 3,
+  "items": [
+    {"id": "f1", "en": "Managing money, household bills, or shopping change", "ar": "إدارة الأموال أو الفواتير المنزلية أو حساب الباقي"},
+    {"id": "f2", "en": "Repeating the same questions or stories in one conversation", "ar": "تكرار نفس الأسئلة أو القصص في المحادثة الواحدة"},
+    {"id": "f3", "en": "Keeping track of the day, date, or current season", "ar": "معرفة اليوم أو التاريخ أو الفصل الحالي"},
+    {"id": "f4", "en": "Using a familiar phone, remote control, or home appliance", "ar": "استخدام الهاتف أو جهاز التحكم أو الأجهزة المنزلية المعتادة"},
+    {"id": "f5", "en": "Finding your way in familiar neighborhoods or mosques/shops", "ar": "معرفة الطريق في الأحياء أو المساجد أو المتاجر المألوفة"},
+    {"id": "f6", "en": "Following a TV program, news story, or group discussion", "ar": "متابعة برنامج تلفزيوني أو خبر أو نقاش جماعي"},
+    {"id": "f7", "en": "Staying engaged in hobbies, reading, or community activities", "ar": "الاستمرار في الهوايات أو القراءة أو الأنشطة الاجتماعية"},
+    {"id": "f8", "en": "Remembering appointments or daily medications without extra reminders", "ar": "تذكر المواعيد أو الأدوية اليومية دون تذكير إضافي"}
+  ]
+}
