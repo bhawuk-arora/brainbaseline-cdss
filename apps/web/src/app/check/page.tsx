@@ -120,12 +120,12 @@ export default function CheckPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6 py-4">
       {/* Step Indicator Header */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs">
-        <div className="flex items-center justify-between text-xs font-bold text-slate-500 mb-2">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-2xs">
+        <div className="flex items-center justify-between text-xs font-medium text-slate-500 mb-2">
           <span>{lang === "ar" ? `الخطوة ${step} من 5` : `Step ${step} of 5`}</span>
-          <span className="text-sky-600 font-extrabold">
+          <span className="text-slate-900 dark:text-white font-semibold">
             {step === 1 && t("check.step_consent")}
             {step === 2 && t("check.step_red_flags")}
             {step === 3 && t("check.step_context")}
@@ -133,9 +133,9 @@ export default function CheckPage() {
             {step === 5 && t("check.step_function")}
           </span>
         </div>
-        <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+        <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
           <div
-            className="bg-sky-600 h-full transition-all duration-300"
+            className="bg-slate-900 dark:bg-slate-100 h-full transition-all duration-300"
             style={{ width: `${(step / 5) * 100}%` }}
           />
         </div>
@@ -143,50 +143,45 @@ export default function CheckPage() {
 
       {/* STEP 1: Consent */}
       {step === 1 && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xs space-y-6">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-sky-100 dark:bg-sky-950 text-sky-600 rounded-xl">
-              <ShieldCheck className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                {t("check.consent_title")}
-              </h2>
-              <p className="text-xs text-slate-500">{t("check.consent_desc")}</p>
-            </div>
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6 shadow-2xs">
+          <div className="space-y-1">
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-white tracking-tight">
+              {t("check.consent_title")}
+            </h2>
+            <p className="text-sm text-slate-500 leading-relaxed font-normal">{t("check.consent_desc")}</p>
           </div>
 
-          <div className="space-y-3 bg-slate-50 dark:bg-slate-800/60 p-4 rounded-xl border border-slate-200 dark:border-slate-700/60 text-xs">
-            <label className="flex items-start gap-3 cursor-pointer">
+          <div className="space-y-3 pt-2">
+            <label className="flex items-start gap-3 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-850 cursor-pointer text-xs text-slate-700 dark:text-slate-300 transition">
               <input
                 type="checkbox"
                 checked={consentCognition}
                 onChange={(e) => setConsentCognition(e.target.checked)}
-                className="mt-0.5 rounded text-sky-600 focus:ring-sky-500 w-4 h-4"
+                className="mt-0.5 rounded text-slate-900 dark:text-slate-100 focus:ring-slate-900 w-4 h-4"
               />
-              <span className="font-medium text-slate-700 dark:text-slate-200">
+              <span className="font-medium leading-relaxed">
                 {t("check.consent_scope_cog")}
               </span>
             </label>
 
-            <label className="flex items-start gap-3 cursor-pointer">
+            <label className="flex items-start gap-3 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-850 cursor-pointer text-xs text-slate-700 dark:text-slate-300 transition">
               <input
                 type="checkbox"
                 checked={consentMalaffi}
                 onChange={(e) => setConsentMalaffi(e.target.checked)}
-                className="mt-0.5 rounded text-sky-600 focus:ring-sky-500 w-4 h-4"
+                className="mt-0.5 rounded text-slate-900 dark:text-slate-100 focus:ring-slate-900 w-4 h-4"
               />
-              <span className="font-medium text-slate-700 dark:text-slate-200">
+              <span className="font-medium leading-relaxed">
                 {t("check.consent_scope_malaffi")}
               </span>
             </label>
           </div>
 
-          <div className="flex justify-end pt-2">
+          <div className="flex justify-end pt-4 border-t border-slate-100 dark:border-slate-800">
             <button
               onClick={() => setStep(2)}
               disabled={!consentCognition}
-              className="px-6 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white font-bold text-xs shadow-md transition-all flex items-center gap-2"
+              className="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white dark:bg-white dark:text-slate-900 font-medium text-xs transition flex items-center gap-2 shadow-2xs"
             >
               <span>{t("check.consent_agree")}</span>
               <ArrowRight className="w-4 h-4" />
@@ -197,89 +192,52 @@ export default function CheckPage() {
 
       {/* STEP 2: Red-Flag Emergency Screen */}
       {step === 2 && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xs space-y-6">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-rose-100 dark:bg-rose-950 text-rose-600 rounded-xl">
-              <AlertTriangle className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                {t("check.red_flags_title")}
-              </h2>
-              <p className="text-xs text-slate-500">{t("check.red_flags_desc")}</p>
-            </div>
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6 shadow-2xs">
+          <div className="space-y-1">
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-white tracking-tight">
+              {t("check.red_flags_title")}
+            </h2>
+            <p className="text-sm text-slate-500 leading-relaxed font-normal">{t("check.red_flags_desc")}</p>
           </div>
 
-          <div className="space-y-3 bg-rose-50/50 dark:bg-rose-950/20 p-4 rounded-xl border border-rose-200 dark:border-rose-900/40 text-xs">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={redFlags.sudden_confusion}
-                onChange={(e) =>
-                  setRedFlags({ ...redFlags, sudden_confusion: e.target.checked })
-                }
-                className="mt-0.5 rounded text-rose-600 focus:ring-rose-500 w-4 h-4"
-              />
-              <span className="font-semibold text-rose-900 dark:text-rose-200">
-                ⚠️ {t("check.rf_confusion")}
-              </span>
-            </label>
-
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={redFlags.speech_trouble}
-                onChange={(e) =>
-                  setRedFlags({ ...redFlags, speech_trouble: e.target.checked })
-                }
-                className="mt-0.5 rounded text-rose-600 focus:ring-rose-500 w-4 h-4"
-              />
-              <span className="font-semibold text-rose-900 dark:text-rose-200">
-                ⚠️ {t("check.rf_speech")}
-              </span>
-            </label>
-
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={redFlags.new_weakness}
-                onChange={(e) =>
-                  setRedFlags({ ...redFlags, new_weakness: e.target.checked })
-                }
-                className="mt-0.5 rounded text-rose-600 focus:ring-rose-500 w-4 h-4"
-              />
-              <span className="font-semibold text-rose-900 dark:text-rose-200">
-                ⚠️ {t("check.rf_weakness")}
-              </span>
-            </label>
-
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={redFlags.recent_fall_head_injury}
-                onChange={(e) =>
-                  setRedFlags({ ...redFlags, recent_fall_head_injury: e.target.checked })
-                }
-                className="mt-0.5 rounded text-rose-600 focus:ring-rose-500 w-4 h-4"
-              />
-              <span className="font-semibold text-rose-900 dark:text-rose-200">
-                ⚠️ {t("check.rf_fall")}
-              </span>
-            </label>
+          <div className="space-y-2.5 pt-2">
+            {[
+              { key: "sudden_confusion", label: t("check.rf_confusion") },
+              { key: "speech_trouble", label: t("check.rf_speech") },
+              { key: "new_weakness", label: t("check.rf_weakness") },
+              { key: "recent_fall_head_injury", label: t("check.rf_head_injury") },
+            ].map((rf) => (
+              <label
+                key={rf.key}
+                className="flex items-start gap-3 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-850 cursor-pointer text-xs text-slate-700 dark:text-slate-300 transition"
+              >
+                <input
+                  type="checkbox"
+                  checked={(redFlags as any)[rf.key]}
+                  onChange={(e) =>
+                    setRedFlags({ ...redFlags, [rf.key]: e.target.checked })
+                  }
+                  className="mt-0.5 rounded text-rose-600 focus:ring-rose-500 w-4 h-4"
+                />
+                <span className="font-medium leading-relaxed">{rf.label}</span>
+              </label>
+            ))}
           </div>
 
-          <div className="flex justify-between items-center pt-2">
+          <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
             <button
               onClick={() => setStep(1)}
-              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs"
+              className="px-4 py-2 text-xs font-medium text-slate-500 hover:text-slate-900 transition flex items-center gap-1.5"
             >
-              {lang === "ar" ? "رجوع" : "Back"}
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back</span>
             </button>
+
             <button
               onClick={() => setStep(3)}
-              className="px-6 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-md transition-all flex items-center gap-2"
+              className="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 font-medium text-xs transition flex items-center gap-2 shadow-2xs"
             >
-              <span>{lang === "ar" ? "متابعة الفحص" : "Continue"}</span>
+              <span>Continue</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>

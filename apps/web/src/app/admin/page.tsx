@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useApp } from "@/lib/context";
 import { api, AuditLogEntry } from "@/lib/api";
 import {
@@ -17,7 +18,16 @@ import {
 } from "lucide-react";
 
 export default function AdminPage() {
-  const { lang, t } = useApp();
+  const { lang, activeRole, isAuthenticated, t } = useApp();
+  const router = useRouter();
+
+  // Authentication & Role Route Guard
+  useEffect(() => {
+    if (!isAuthenticated || activeRole !== "admin") {
+      router.push("/auth");
+    }
+  }, [isAuthenticated, activeRole, router]);
+
   const [activeTab, setActiveTab] = useState<"benchmark" | "fairness" | "economics" | "audit">("benchmark");
   const [benchmark, setBenchmark] = useState<any>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);

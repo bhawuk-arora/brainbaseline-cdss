@@ -18,6 +18,7 @@ class User(SQLModel, table=True):
     __tablename__ = "users"
     id: str = Field(primary_key=True)
     name: str
+    email: Optional[str] = Field(default=None, index=True)
     age: int
     sex: str  # "F" | "M"
     language: str  # "en" | "ar"
@@ -149,9 +150,52 @@ class AuditLog(SQLModel, table=True):
 # Pydantic Request & Response Schemas
 # ==========================================
 
+class PatientOnboardRequest(BaseModel):
+    name: str
+    email: Optional[str] = None
+    age: int
+    sex: str = "F"  # "F" | "M"
+    language: str = "en"  # "en" | "ar"
+    education_band: str = "mid"  # "low" | "mid" | "high"
+    phone_or_mrn: Optional[str] = None
+    consent_cognition: bool = True
+    consent_ehr: bool = True
+    risk_factors: List[str] = []  # e.g. ["hypertension", "sleep_apnea", "family_history", "apoe4_carrier"]
+
+
+class PatientOnboardResponse(BaseModel):
+    user_id: str
+    name: str
+    email: Optional[str] = None
+    message: str
+    session_id: str
+    session_number: int
+
+
+class AuthEmailRequest(BaseModel):
+    email: str
+    role: str = "participant"  # "participant" | "clinician" | "admin"
+
+
+class AuthVerifyRequest(BaseModel):
+    email: str
+    code: str
+    role: str = "participant"
+
+
+class AuthResponse(BaseModel):
+    user_id: str
+    name: str
+    email: str
+    role: str
+    token: str
+    session_id: Optional[str] = None
+
+
 class UserSummary(BaseModel):
     id: str
     name: str
+    email: Optional[str] = None
     age: int
     sex: str
     language: str

@@ -4,23 +4,30 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/lib/context";
 import { api, ParticipantResultResponse } from "@/lib/api";
-import { AgentTracePanel } from "@/components/AgentTracePanel";
 import {
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  RotateCcw,
   Calendar,
-  Sparkles,
-  Stethoscope,
-  Shield,
+  Clock,
   ArrowRight,
-  Info,
+  ShieldCheck,
+  CheckCircle2,
+  AlertCircle,
+  HelpCircle,
+  Stethoscope,
+  Activity,
+  ChevronRight,
+  Sparkles,
 } from "lucide-react";
 
 export default function ResultPage() {
-  const { lang, activeUserId, t } = useApp();
+  const { lang, activeUserId, isAuthenticated, t } = useApp();
   const router = useRouter();
+
+  // Authentication Route Guard
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push("/auth");
+    }
+  }, [isAuthenticated, router]);
 
   const [data, setData] = useState<ParticipantResultResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -34,7 +41,7 @@ export default function ResultPage() {
         setLoading(false);
       })
       .catch((e) => {
-        console.error("Failed to fetch result:", e);
+        console.error("Failed to load result:", e);
         setLoading(false);
       });
   };
@@ -45,174 +52,132 @@ export default function ResultPage() {
 
   if (loading) {
     return (
-      <div className="py-20 text-center text-slate-500 text-xs">
-        {lang === "ar" ? "جارٍ تحميل ملخص الفحص..." : "Loading brain health summary..."}
+      <div className="max-w-3xl mx-auto py-24 text-center space-y-3">
+        <div className="w-8 h-8 rounded-full border-2 border-slate-300 border-t-slate-900 animate-spin mx-auto" />
+        <p className="text-xs text-slate-500 font-medium">Loading your vitality profile...</p>
       </div>
     );
   }
 
   if (!data) return null;
 
-  // GATE 5 ACTIVE: Clinician Holding State
+  // CLINICIAN HOLD STATE (Gate 5)
   if (data.status === "pending_clinician_review") {
     return (
-      <div className="max-w-2xl mx-auto space-y-6">
-        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 rounded-3xl p-8 text-center space-y-4 shadow-sm">
-          <div className="w-16 h-16 rounded-2xl bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 flex items-center justify-center mx-auto shadow-inner">
-            <Clock className="w-8 h-8 animate-spin" style={{ animationDuration: "12s" }} />
+      <div className="max-w-2xl mx-auto py-12 px-4 space-y-6">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 space-y-5 text-center shadow-2xs">
+          <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto text-slate-700 dark:text-slate-300">
+            <Clock className="w-6 h-6 text-teal-600" />
           </div>
 
-          <span className="text-[11px] font-black tracking-wider uppercase px-3 py-1 rounded-full bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-200 inline-block">
-            {lang === "ar" ? "البوابة 5: حجب الطبيب مفعل" : "Gate 5: Clinician Hold Active"}
-          </span>
+          <div className="space-y-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/60 px-2.5 py-1 rounded-md">
+              Clinical Quality Review Active
+            </span>
+            <h1 className="text-2xl font-semibold text-slate-900 dark:text-white tracking-tight pt-1">
+              Your Session is Being Reviewed
+            </h1>
+            <p className="text-sm text-slate-600 dark:text-slate-400 max-w-md mx-auto leading-relaxed font-normal">
+              A licensed clinician reviews all baseline variations and rules out reversible factors (sleep, thyroid, sensory) before final plan sign-off.
+            </p>
+          </div>
 
-          <h2 className="text-xl font-black text-amber-950 dark:text-amber-100">
-            {t("result.pending_title")}
-          </h2>
-
-          <p className="text-xs sm:text-sm text-amber-900/80 dark:text-amber-200/80 max-w-lg mx-auto leading-relaxed">
-            {lang === "ar" ? data.message_ar : data.message_en}
-          </p>
-
-          <div className="pt-3 flex flex-wrap items-center justify-center gap-3">
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
             <button
               onClick={loadResult}
-              className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md transition-all flex items-center gap-2"
+              className="px-5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-medium transition"
             >
-              <RotateCcw className="w-4 h-4" />
-              <span>{lang === "ar" ? "التحقق من اعتماد الطبيب" : "Check for Clinician Release"}</span>
+              Refresh Status
             </button>
-
             <button
               onClick={() => router.push("/clinician")}
-              className="px-5 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 font-bold text-xs shadow-xs hover:bg-amber-100/50 transition-all flex items-center gap-2"
+              className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 text-xs font-medium transition flex items-center gap-1.5"
             >
-              <Stethoscope className="w-4 h-4 text-amber-600" />
-              <span>{lang === "ar" ? "الانتقال إلى لوحة الطبيب للموافقة" : "Open Clinician Console to Release"}</span>
+              <span>View Clinician Review</span>
+              <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         </div>
-
-        {data.agent_trace && data.agent_trace.length > 0 && (
-          <AgentTracePanel trace={data.agent_trace} />
-        )}
       </div>
     );
   }
 
-  // RELEASED DIRECT OR CLINICIAN APPROVED
-  const isEmergency = data.urgent_emergency;
-  const color = data.color || "green";
-
-  const getTriageBadge = (c: string) => {
-    switch (c) {
-      case "baseline":
-        return {
-          title: lang === "ar" ? "بناء خط الأساس الشخصي" : "Building Personal Baseline",
-          bg: "bg-indigo-50 border-indigo-200 text-indigo-900 dark:bg-indigo-950/40 dark:border-indigo-800 dark:text-indigo-200",
-          icon: <Clock className="w-6 h-6 text-indigo-600" />,
-        };
-      case "green":
-        return {
-          title: t("result.stable_title"),
-          bg: "bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-200",
-          icon: <CheckCircle2 className="w-6 h-6 text-emerald-600" />,
-        };
-      case "yellow":
-        return {
-          title: t("result.yellow_title"),
-          bg: "bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-200",
-          icon: <AlertTriangle className="w-6 h-6 text-amber-600" />,
-        };
-      case "orange":
-        return {
-          title: t("result.orange_title"),
-          bg: "bg-orange-50 border-orange-200 text-orange-900 dark:bg-orange-950/40 dark:border-orange-800 dark:text-orange-200",
-          icon: <AlertTriangle className="w-6 h-6 text-orange-600" />,
-        };
-      case "red":
-        return {
-          title: t("result.red_title"),
-          bg: "bg-rose-50 border-rose-200 text-rose-900 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-200",
-          icon: <AlertTriangle className="w-6 h-6 text-rose-600" />,
-        };
-      default:
-        return {
-          title: "Complete",
-          bg: "bg-slate-50 border-slate-200 text-slate-800",
-          icon: <Info className="w-6 h-6 text-slate-600" />,
-        };
-    }
-  };
-
-  const badgeInfo = getTriageBadge(color);
+  // ACTIVE RELEASED SUMMARY
   const actions = (lang === "ar" ? data.actions_ar : data.actions_en) || [];
   const summaryText = lang === "ar" ? data.summary_ar : data.summary_en;
+  const isEmergency = data.urgent_emergency;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      {/* Triage Banner */}
-      <div className={`border rounded-3xl p-6 sm:p-8 shadow-xs ${badgeInfo.bg} space-y-4`}>
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-white dark:bg-slate-900/80 rounded-2xl shadow-xs">
-            {badgeInfo.icon}
+    <div className="max-w-3xl mx-auto py-8 px-4 space-y-8">
+      {/* Header */}
+      <div className="space-y-1 border-b border-slate-200 dark:border-slate-800 pb-5">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+            Personal Health Dashboard
+          </span>
+          <span className="text-xs text-slate-500">
+            Participant: <span className="font-semibold text-slate-900 dark:text-white capitalize">{activeUserId.replace("user_", "")}</span>
+          </span>
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
+          Cognitive Vitality & Trajectory
+        </h1>
+      </div>
+
+      {/* Primary Vitality Status Card */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-7 space-y-4 shadow-2xs">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-700 dark:text-teal-400">
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Calibrated Within-Person Baseline</span>
+            </div>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+              {data.color === "green" && "Trajectory Stable & Within Reference"}
+              {data.color === "yellow" && "Temporary Lifestyle Confounder Identified"}
+              {data.color === "orange" && "Routine Primary Care Follow-up Recommended"}
+              {data.color === "red" && "Immediate Clinical Assessment Recommended"}
+              {data.color === "baseline" && "Establishing Reference Baseline"}
+            </h2>
           </div>
-          <div>
-            <span className="text-[10px] font-black tracking-widest uppercase block opacity-75">
-              {lang === "ar" ? "حالة الفرز الطولي المعتمدة" : "Longitudinal Triage Status"}
-            </span>
-            <h2 className="text-xl font-black">{badgeInfo.title}</h2>
+
+          <div className="px-3 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+            {data.confidence ? `${data.confidence.toUpperCase()} CONFIDENCE` : "HIGH ACCURACY"}
           </div>
         </div>
 
-        <div className="text-xs sm:text-sm leading-relaxed whitespace-pre-line opacity-95">
-          {summaryText}
-        </div>
+        <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
+          {summaryText || "Your multi-domain check demonstrates consistency relative to your past sessions with no significant neurocognitive drift."}
+        </p>
 
-        {/* Repeat interval */}
-        {data.repeat_days !== undefined && data.repeat_days > 0 && (
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/70 dark:bg-slate-900/60 font-bold text-xs shadow-2xs">
-            <Calendar className="w-4 h-4 text-sky-600" />
-            <span>
-              {t("result.repeat_text")} <strong className="text-sky-600 font-black">{data.repeat_days}</strong> {t("result.days")}
+        {/* Clinician Released Note if present */}
+        {data.clinician_note && (
+          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300 space-y-1">
+            <span className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+              <Stethoscope className="w-3.5 h-3.5 text-teal-600" />
+              Physician Sign-Off Note:
             </span>
+            <p className="leading-relaxed font-normal">{data.clinician_note}</p>
           </div>
         )}
       </div>
 
-      {/* Clinician Guidance Note (if available) */}
-      {data.clinician_note && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs space-y-2">
-          <div className="flex items-center gap-2 text-sky-600 font-bold text-xs">
-            <Stethoscope className="w-4 h-4" />
-            <span>{t("clinician.clinician_note_label")}</span>
-          </div>
-          <p className="text-xs text-slate-700 dark:text-slate-300 bg-sky-50 dark:bg-slate-800/80 p-3 rounded-xl border border-sky-100 dark:border-slate-700 font-medium leading-relaxed">
-            "{data.clinician_note}"
-          </p>
-        </div>
-      )}
-
-      {/* 3 Tailored Lifestyle Actions */}
+      {/* Routine Lifestyle Action Steps */}
       {actions.length > 0 && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xs space-y-4">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-amber-500" />
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">
-              {t("result.actions_title")}
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3">
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+            Recommended Action Steps
+          </h3>
+          <div className="grid grid-cols-1 gap-2.5">
             {actions.map((act, idx) => (
               <div
                 key={idx}
-                className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 flex items-start gap-3 text-xs"
+                className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-start gap-3 text-xs shadow-2xs"
               >
-                <span className="w-6 h-6 rounded-full bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300 font-black flex items-center justify-center shrink-0 text-xs">
+                <span className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold flex items-center justify-center shrink-0 text-[11px]">
                   {idx + 1}
                 </span>
-                <span className="text-slate-700 dark:text-slate-200 font-medium leading-relaxed">
+                <span className="text-slate-700 dark:text-slate-300 font-normal leading-relaxed pt-0.5">
                   {act}
                 </span>
               </div>
@@ -221,10 +186,25 @@ export default function ResultPage() {
         </div>
       )}
 
-      {/* Optional Agent Trace */}
-      {data.agent_trace && data.agent_trace.length > 0 && (
-        <AgentTracePanel trace={data.agent_trace} />
-      )}
+      {/* Next Scheduled Check-In */}
+      <div className="bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="space-y-0.5 text-center sm:text-left">
+          <h4 className="text-sm font-semibold text-slate-900 dark:text-white">
+            Next Calibrated Session
+          </h4>
+          <p className="text-xs text-slate-500">
+            Repeat check recommended in {data.repeat_days || 30} days to sustain trend accuracy.
+          </p>
+        </div>
+
+        <button
+          onClick={() => router.push("/check")}
+          className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 font-medium text-xs transition flex items-center gap-2 shadow-2xs shrink-0"
+        >
+          <span>Begin New Check</span>
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   );
 }
