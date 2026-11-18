@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/lib/context";
 import { api } from "@/lib/api";
@@ -16,7 +16,14 @@ import {
 
 export default function OnboardPatientPage() {
   const router = useRouter();
-  const { lang, setActiveUserId, setActiveRole } = useApp();
+  const { lang, setActiveUserId, setActiveRole, isAuthenticated, activeRole } = useApp();
+
+  // Clinician & Admin Route Guard
+  useEffect(() => {
+    if (!isAuthenticated || (activeRole !== "clinician" && activeRole !== "admin")) {
+      router.push("/auth");
+    }
+  }, [isAuthenticated, activeRole, router]);
 
   const [formData, setFormData] = useState({
     name: "",

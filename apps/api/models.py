@@ -19,6 +19,14 @@ class User(SQLModel, table=True):
     id: str = Field(primary_key=True)
     name: str
     email: Optional[str] = Field(default=None, index=True)
+    password: Optional[str] = Field(default="password123")
+    role: str = Field(default="participant", index=True)  # "participant" | "clinician" | "director" | "admin"
+    is_active: bool = Field(default=True)
+    attending_clinician_id: Optional[str] = Field(default=None, index=True)
+    mrn: Optional[str] = Field(default=None, index=True)
+    insurance_provider: Optional[str] = Field(default="Thiqa / Daman")
+    copay_status: Optional[str] = Field(default="completed")
+    department: Optional[str] = Field(default="Cognitive Neurology / Memory Clinic")
     age: int
     sex: str  # "F" | "M"
     language: str  # "en" | "ar"
@@ -126,6 +134,7 @@ class Review(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     triage_id: str = Field(index=True, unique=True)
     user_id: str = Field(index=True)
+    attending_clinician_id: Optional[str] = Field(default=None, index=True)
     clinician_id: Optional[str] = None
     decision: Optional[str] = None  # "approve" | "edit" | "escalate"
     note: Optional[str] = None
@@ -172,15 +181,22 @@ class PatientOnboardResponse(BaseModel):
     session_number: int
 
 
+class AuthLoginRequest(BaseModel):
+    email: str
+    password: str
+    role: Optional[str] = None  # Auto-resolved from user account/domain if omitted
+
+
+# Backwards compatibility models
 class AuthEmailRequest(BaseModel):
     email: str
-    role: str = "participant"  # "participant" | "clinician" | "admin"
+    role: Optional[str] = "participant"
 
 
 class AuthVerifyRequest(BaseModel):
     email: str
     code: str
-    role: str = "participant"
+    role: Optional[str] = "participant"
 
 
 class AuthResponse(BaseModel):
@@ -192,16 +208,61 @@ class AuthResponse(BaseModel):
     session_id: Optional[str] = None
 
 
+class ClinicianSummary(BaseModel):
+    id: str
+    name: str
+    specialty: str
+    department: str
+    email: str
+    active_cases_count: int
+    overdue_reviews_count: int
+    avg_turnaround_hours: float
+    status: str  # "active" | "on_call" | "offline"
+    license_id: str
+
+
+class AdminOverrideReleaseRequest(BaseModel):
+    triage_id: str
+    admin_id: str = "director_healthcare"
+    decision: str = "approve"  # "approve" | "escalate"
+    override_reason: str
+    target_clinician_id: Optional[str] = None
+    referral_destination: Optional[str] = "SEHA Primary Care / Specialist Review"
+
+
 class UserSummary(BaseModel):
     id: str
     name: str
     email: Optional[str] = None
+    role: str = "participant"  # "participant" | "clinician" | "director" | "admin"
+    is_active: bool = True
     age: int
     sex: str
     language: str
     education_band: str
     latest_triage_color: str
     pending_review: bool
+
+
+class IAMUserCreateRequest(BaseModel):
+    name: str
+    email: str
+    password: Optional[str] = "password123"
+    role: str = "participant"  # "participant" | "clinician" | "director" | "admin"
+    age: int = 50
+    sex: str = "F"
+    language: str = "ar"
+    education_band: str = "mid"
+    admin_actor: str = "admin@doh.gov.ae"
+
+
+class IAMUserUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    role: Optional[str] = None
+    is_active: Optional[bool] = None
+    password: Optional[str] = None
+    admin_actor: str = "admin@doh.gov.ae"
 
 
 class ConsentItem(BaseModel):
@@ -329,6 +390,8 @@ class ParticipantResultResponse(BaseModel):
     actions_ar: Optional[List[str]] = None
     repeat_days: Optional[int] = None
     clinician_note: Optional[str] = None
+    attending_clinician_name: Optional[str] = None
+    attending_clinician_id: Optional[str] = None
     message_en: Optional[str] = None
     message_ar: Optional[str] = None
     agent_trace: List[GateStep] = []
@@ -338,6 +401,8 @@ class ReviewQueueItem(BaseModel):
     triage_id: str
     user_id: str
     user_name: str
+    attending_clinician_id: Optional[str] = None
+    attending_clinician_name: Optional[str] = None
     age: int
     language: str
     session_number: int
@@ -349,6 +414,7 @@ class ReviewQueueItem(BaseModel):
     risk_profile: UserRiskResponse
     reversible_causes: List[Dict[str, str]]
     agent_trace: List[GateStep]
+    context_intake: Optional[Dict[str, Any]] = None
 
 
 class ReviewDecisionBody(BaseModel):
@@ -357,6 +423,49 @@ class ReviewDecisionBody(BaseModel):
     note: str
     checked_causes: List[str] = []
     referral_destination: Optional[str] = None
+
+
+class ParticipantContextCheckinRequest(BaseModel):
+    user_id: str
+    sleep_hours: float = 7.0
+    mood_positive: bool = True
+    illness: bool = False
+    new_medication: bool = False
+    pain: bool = False
+    distraction: bool = False
+    sensory_strain: bool = False  # e.g., uncorrected vision or hearing difficulty
+    recent_stress_event: bool = False
+    patient_notes: Optional[str] = None
+
+
+class ClinicianAssignRequest(BaseModel):
+    clinician_id: str
+    patient_id: str
+
+
+class ReceptionIntakeRequest(BaseModel):
+    name: str
+    email: Optional[str] = None
+    emirates_id_or_mrn: str
+    insurance_provider: str = "Thiqa (Daman)"  # "Thiqa (Daman)" | "Daman Enhanced" | "NAS" | "Self-Pay"
+    copay_status: str = "completed"  # "completed" | "exempt" | "pending"
+    department: str = "Cognitive Neurology / Memory Clinic"
+    attending_clinician_id: str  # e.g., "dr_nour", "dr_khalid", "dr_fatima"
+    age: int
+    sex: str = "F"  # "F" | "M"
+    language: str = "en"  # "en" | "ar"
+    education_band: str = "mid"  # "low" | "mid" | "high"
+
+
+class ReceptionIntakeResponse(BaseModel):
+    status: str
+    user_id: str
+    mrn: str
+    patient_name: str
+    attending_clinician_id: str
+    attending_clinician_name: str
+    session_id: str
+    message: str
 
 
 class ReviewDecisionResponse(BaseModel):

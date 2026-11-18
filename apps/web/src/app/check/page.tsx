@@ -21,8 +21,15 @@ import {
 } from "lucide-react";
 
 export default function CheckPage() {
-  const { lang, activeUserId, t } = useApp();
+  const { lang, activeUserId, isAuthenticated, t } = useApp();
   const router = useRouter();
+
+  // Authentication Route Guard
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push("/auth");
+    }
+  }, [isAuthenticated, router]);
 
   const [step, setStep] = useState<number>(1);
   const [sessionId, setSessionId] = useState<string>("");

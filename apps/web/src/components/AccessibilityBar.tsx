@@ -45,10 +45,11 @@ export const AccessibilityBar: React.FC = () => {
   const pathname = usePathname();
   const [showDevDrawer, setShowDevDrawer] = useState(false);
 
-  const handleRoleSwitch = (role: "participant" | "clinician" | "admin") => {
+  const handleRoleSwitch = (role: "participant" | "clinician" | "director" | "admin") => {
     setActiveRole(role);
     if (role === "participant") router.push("/result");
     else if (role === "clinician") router.push("/clinician");
+    else if (role === "director") router.push("/director");
     else if (role === "admin") router.push("/admin");
   };
 
@@ -72,6 +73,7 @@ export const AccessibilityBar: React.FC = () => {
               <span className="text-[10px] text-slate-500 font-medium block">
                 {activeRole === "participant" && "Patient Vitality Portal"}
                 {activeRole === "clinician" && "Clinical Decision Workstation"}
+                {activeRole === "director" && "Hospital Medical Director"}
                 {activeRole === "admin" && "Health Authority & Governance"}
               </span>
             </div>
@@ -121,6 +123,27 @@ export const AccessibilityBar: React.FC = () => {
               </>
             )}
 
+            {activeRole === "director" && (
+              <>
+                <button
+                  onClick={() => router.push("/director")}
+                  className={`px-3 py-1.5 rounded-lg transition ${
+                    pathname === "/director" ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-bold" : "hover:text-slate-900"
+                  }`}
+                >
+                  Hospital Director Operations
+                </button>
+                <button
+                  onClick={() => router.push("/clinician")}
+                  className={`px-3 py-1.5 rounded-lg transition ${
+                    pathname === "/clinician" ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-bold" : "hover:text-slate-900"
+                  }`}
+                >
+                  Doctor Console
+                </button>
+              </>
+            )}
+
             {activeRole === "admin" && (
               <>
                 <button
@@ -129,7 +152,15 @@ export const AccessibilityBar: React.FC = () => {
                     pathname === "/admin" ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-bold" : "hover:text-slate-900"
                   }`}
                 >
-                  Population Health Analytics
+                  Root Population Benchmarks
+                </button>
+                <button
+                  onClick={() => router.push("/director")}
+                  className={`px-3 py-1.5 rounded-lg transition ${
+                    pathname === "/director" ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-bold" : "hover:text-slate-900"
+                  }`}
+                >
+                  Director Console
                 </button>
               </>
             )}
@@ -191,63 +222,9 @@ export const AccessibilityBar: React.FC = () => {
             </button>
           )}
 
-          {/* Subtle Testing Sandbox Toggle (Discrete) */}
-          <button
-            onClick={() => setShowDevDrawer(!showDevDrawer)}
-            title="Open Demo Persona Switcher"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-          >
-            <Menu className="w-4 h-4" />
-          </button>
+          {/* Testing Switcher removed for pure production integrity */}
         </div>
       </div>
-
-      {/* Discrete Testing Sandbox Drawer (Keeps the product clean while enabling testing) */}
-      {showDevDrawer && (
-        <div className="bg-slate-900 text-white border-t border-slate-800 px-4 sm:px-6 lg:px-8 py-3 text-xs">
-          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-teal-400 uppercase tracking-wider text-[10px]">
-                Demo Testing Sandbox:
-              </span>
-              <span className="text-slate-400">Switch test patient to simulate real clinical states:</span>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {[
-                { id: "user_sara", label: "Sara (Normal Patient - Baseline 2/4)", role: "participant", route: "/result" },
-                { id: "user_layla", label: "Layla (Orange Held - Clinician Review)", role: "clinician", route: "/clinician" },
-                { id: "user_tariq", label: "Tariq (Yellow Sleep Confounder)", role: "participant", route: "/result" },
-                { id: "user_omar", label: "Omar (Emergency Stroke Bypass)", role: "participant", route: "/result" },
-                { id: "user_fatima", label: "Fatima (Low-Edu Fairness Case)", role: "admin", route: "/admin" },
-              ].map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => {
-                    setActiveUserId(p.id);
-                    setActiveRole(p.role as any);
-                    router.push(p.route);
-                    setShowDevDrawer(false);
-                  }}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition ${
-                    activeUserId === p.id
-                      ? "bg-teal-600 text-white font-bold"
-                      : "bg-slate-800 hover:bg-slate-700 text-slate-300"
-                  }`}
-                >
-                  {p.label}
-                </button>
-              ))}
-              <button
-                onClick={() => setShowDevDrawer(false)}
-                className="p-1 text-slate-500 hover:text-white ml-2"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </header>
   );
 };

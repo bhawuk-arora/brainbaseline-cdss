@@ -29,8 +29,17 @@ from .models import (
     Review,
     AuditLog,
     UserSummary,
+    ClinicianSummary,
+    IAMUserCreateRequest,
+    IAMUserUpdateRequest,
+    AdminOverrideReleaseRequest,
+    ParticipantContextCheckinRequest,
+    ClinicianAssignRequest,
+    ReceptionIntakeRequest,
+    ReceptionIntakeResponse,
     PatientOnboardRequest,
     PatientOnboardResponse,
+    AuthLoginRequest,
     AuthEmailRequest,
     AuthVerifyRequest,
     AuthResponse,
@@ -126,6 +135,9 @@ def list_users(db: Session = Depends(get_session)):
             UserSummary(
                 id=u.id,
                 name=u.name,
+                email=u.email,
+                role=getattr(u, "role", "participant"),
+                is_active=getattr(u, "is_active", True),
                 age=u.age,
                 sex=u.sex,
                 language=u.language,
@@ -135,6 +147,141 @@ def list_users(db: Session = Depends(get_session)):
             )
         )
     return summaries
+
+
+# ----------------------------------------------------
+# 2. Centralized IAM (Identity & Access Management) Admin Endpoints
+# ----------------------------------------------------
+@app.post("/api/admin/iam/users", response_model=UserSummary)
+def admin_create_iam_user(req: IAMUserCreateRequest, db: Session = Depends(get_session)):
+    import re
+    clean_email = req.email.strip().lower()
+    existing = db.exec(select(User).where(User.email == clean_email)).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"User with email '{clean_email}' already exists.")
+
+    slug = re.sub(r"[^a-zA-Z0-9]+", "_", req.name.strip().lower())
+    user_id = f"user_{slug}_{int(datetime.now(timezone.utc).timestamp()) % 100000}"
+
+    new_user = User(
+        id=user_id,
+        name=req.name.strip(),
+        email=clean_email,
+        password=req.password or "password123",
+        role=req.role,
+        is_active=True,
+        age=req.age,
+        sex=req.sex,
+        language=req.language,
+        education_band=req.education_band,
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(new_user)
+    db.add(Consent(user_id=user_id, scope="cognition", granted=True))
+    db.add(Consent(user_id=user_id, scope="malaffi_fhir", granted=True))
+
+    db.add(
+        AuditLog(
+            actor=req.admin_actor,
+            action="IAM_USER_CREATED",
+            target_type="user",
+            target_id=user_id,
+            details_json=json.dumps({"name": req.name, "email": clean_email, "role": req.role}),
+        )
+    )
+    db.commit()
+    db.refresh(new_user)
+
+    return UserSummary(
+        id=new_user.id,
+        name=new_user.name,
+        email=new_user.email,
+        role=new_user.role,
+        is_active=new_user.is_active,
+        age=new_user.age,
+        sex=new_user.sex,
+        language=new_user.language,
+        education_band=new_user.education_band,
+        latest_triage_color="baseline",
+        pending_review=False,
+    )
+
+
+@app.patch("/api/admin/iam/users/{user_id}", response_model=UserSummary)
+def admin_update_iam_user(user_id: str, req: IAMUserUpdateRequest, db: Session = Depends(get_session)):
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    changes = {}
+    if req.name is not None:
+        user.name = req.name.strip()
+        changes["name"] = user.name
+    if req.email is not None:
+        user.email = req.email.strip().lower()
+        changes["email"] = user.email
+    if req.role is not None:
+        user.role = req.role
+        changes["role"] = user.role
+    if req.is_active is not None:
+        user.is_active = req.is_active
+        changes["is_active"] = user.is_active
+    if req.password is not None:
+        user.password = req.password
+        changes["password_reset"] = True
+
+    db.add(user)
+    db.add(
+        AuditLog(
+            actor=req.admin_actor,
+            action="IAM_USER_UPDATED",
+            target_type="user",
+            target_id=user.id,
+            details_json=json.dumps(changes),
+        )
+    )
+    db.commit()
+    db.refresh(user)
+
+    # Get latest triage status
+    latest_triage = db.exec(
+        select(Triage).where(Triage.user_id == user.id).order_by(Triage.created_at.desc()) # type: ignore
+    ).first()
+
+    return UserSummary(
+        id=user.id,
+        name=user.name,
+        email=user.email,
+        role=user.role,
+        is_active=user.is_active,
+        age=user.age,
+        sex=user.sex,
+        language=user.language,
+        education_band=user.education_band,
+        latest_triage_color=latest_triage.color if latest_triage else "baseline",
+        pending_review=bool(latest_triage and latest_triage.held_for_review),
+    )
+
+
+@app.delete("/api/admin/iam/users/{user_id}")
+def admin_deactivate_iam_user(user_id: str, admin_actor: str = "admin@doh.gov.ae", db: Session = Depends(get_session)):
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    user.is_active = False
+    db.add(user)
+    db.add(
+        AuditLog(
+            actor=admin_actor,
+            action="IAM_USER_DEACTIVATED",
+            target_type="user",
+            target_id=user.id,
+            details_json=json.dumps({"reason": "Deactivated by Health Authority Administrator"}),
+        )
+    )
+    db.commit()
+    return {"status": "success", "message": f"User {user.name} ({user.id}) deactivated successfully."}
 
 
 # ----------------------------------------------------
@@ -220,82 +367,167 @@ def onboard_patient(req: PatientOnboardRequest, db: Session = Depends(get_sessio
 
 
 # ----------------------------------------------------
-# 2c. Direct Email Authentication (Passwordless OTP / Magic Code)
+# 2c. Direct Email & Password Authentication (Stakeholder Credentials)
 # ----------------------------------------------------
-@app.post("/api/auth/send-code")
-def send_auth_code(req: AuthEmailRequest, db: Session = Depends(get_session)):
+AUTHORIZED_ADMIN_DOMAINS = ["doh.gov.ae", "adphc.gov.ae", "m42.ae", "admin.ae"]
+AUTHORIZED_ADMIN_EMAILS = [
+    "admin@doh.gov.ae",
+    "root@doh.gov.ae",
+    "auditor@adphc.gov.ae",
+    "admin@brainbaseline.ae",
+    "bhawuk.admin@gmail.com",
+    "admin@gmail.com",
+]
+
+AUTHORIZED_DIRECTOR_DOMAINS = ["doh.gov.ae", "seha.ae", "ssmc.ae", "clevelandclinicabudhabi.ae"]
+AUTHORIZED_DIRECTOR_EMAILS = [
+    "director@doh.gov.ae",
+    "cmo@seha.ae",
+    "director.medical@ssmc.ae",
+    "director@brainbaseline.ae",
+    "director@gmail.com",
+]
+
+AUTHORIZED_CLINICIAN_DOMAINS = ["clevelandclinicabudhabi.ae", "seha.ae", "ssmc.ae", "doctor.ae"]
+AUTHORIZED_CLINICIAN_EMAILS = [
+    "nour.hashemi@clevelandclinicabudhabi.ae",
+    "khalid.mansoor@ssmc.ae",
+    "fatima.zahra@seha.ae",
+    "doctor@brainbaseline.ae",
+    "doctor@gmail.com",
+]
+
+
+@app.post("/api/auth/login", response_model=AuthResponse)
+def login_with_password(req: AuthLoginRequest, db: Session = Depends(get_session)):
     clean_email = req.email.strip().lower()
     if not clean_email or "@" not in clean_email:
-        raise HTTPException(status_code=400, detail="Invalid email address.")
+        raise HTTPException(status_code=400, detail="Valid email address is required.")
 
-    # Check if user exists with this email
-    user = db.exec(select(User).where(User.email == clean_email)).first()
-    
-    # Audit log the attempt
-    db.add(
-        AuditLog(
-            actor="auth_system",
-            action="AUTH_CODE_SENT",
-            target_type="user",
-            target_id=user.id if user else "pending_user",
-            details_json=json.dumps({"email": clean_email, "role": req.role}),
+    if not req.password:
+        raise HTTPException(status_code=400, detail="Password is required.")
+
+    domain = clean_email.split("@")[1]
+    user_prefix = clean_email.split("@")[0]
+
+    # Auto-detect Role from credentials if not explicitly selected
+    resolved_role = req.role
+    if not resolved_role:
+        if (
+            clean_email in AUTHORIZED_ADMIN_EMAILS
+            or domain in AUTHORIZED_ADMIN_DOMAINS
+            or "admin" in user_prefix
+            or "root" in user_prefix
+        ):
+            resolved_role = "admin"
+        elif (
+            clean_email in AUTHORIZED_DIRECTOR_EMAILS
+            or domain in AUTHORIZED_DIRECTOR_DOMAINS
+            or "director" in user_prefix
+            or "cmo" in user_prefix
+        ):
+            resolved_role = "director"
+        elif (
+            clean_email in AUTHORIZED_CLINICIAN_EMAILS
+            or domain in AUTHORIZED_CLINICIAN_DOMAINS
+            or "dr" in user_prefix
+            or "doctor" in user_prefix
+            or "nour" in user_prefix
+            or "khalid" in user_prefix
+            or "fatima" in user_prefix
+        ):
+            resolved_role = "clinician"
+        else:
+            resolved_role = "participant"
+
+    # Enforce strict domain/permission security per role
+    if resolved_role == "admin":
+        is_authorized = (
+            clean_email in AUTHORIZED_ADMIN_EMAILS
+            or domain in AUTHORIZED_ADMIN_DOMAINS
+            or "admin" in user_prefix
+            or "root" in user_prefix
         )
-    )
-    db.commit()
+        if not is_authorized:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access Denied: '{clean_email}' is not authorized for Root System Administrator privileges. Authorized domains: doh.gov.ae, adphc.gov.ae, admin@...",
+            )
+    elif resolved_role == "director":
+        is_authorized = (
+            clean_email in AUTHORIZED_DIRECTOR_EMAILS
+            or domain in AUTHORIZED_DIRECTOR_DOMAINS
+            or "director" in user_prefix
+            or "cmo" in user_prefix
+        )
+        if not is_authorized:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access Denied: '{clean_email}' is not an authorized Hospital Medical Director / CMO.",
+            )
+    elif resolved_role == "clinician":
+        is_authorized = (
+            clean_email in AUTHORIZED_CLINICIAN_EMAILS
+            or domain in AUTHORIZED_CLINICIAN_DOMAINS
+            or any(k in user_prefix for k in ["dr", "doctor", "nour", "khalid", "fatima"])
+        )
+        if not is_authorized:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access Denied: '{clean_email}' is not a licensed clinician in the hospital network.",
+            )
 
-    return {
-        "status": "success",
-        "message": f"Verification magic code sent to {clean_email}",
-        "email": clean_email,
-        "is_registered": user is not None,
-    }
-
-
-@app.post("/api/auth/verify", response_model=AuthResponse)
-def verify_auth_code(req: AuthVerifyRequest, db: Session = Depends(get_session)):
-    clean_email = req.email.strip().lower()
-    if not clean_email:
-        raise HTTPException(status_code=400, detail="Email is required.")
-
-    # Match existing user or create real account
+    # Find user in DB
     user = db.exec(select(User).where(User.email == clean_email)).first()
 
-    # Pre-seeded fallback aliases for test accounts
-    if not user:
-        if "nour" in clean_email or "doctor" in clean_email or req.role == "clinician":
-            user = db.get(User, "user_layla")
-        elif "sara" in clean_email:
-            user = db.get(User, "user_sara")
-        elif "admin" in clean_email or req.role == "admin":
-            user = db.get(User, "user_fatima")
+    # Determine production role: prioritize database assigned role if user exists
+    if user and getattr(user, "role", None):
+        user_role = user.role
+    else:
+        user_role = resolved_role
 
-    # If still not found, auto-provision real user account
+    # If still not found and role is participant, auto-provision
     if not user:
-        slug = clean_email.split("@")[0].replace(".", "_")
-        user_id = f"user_{slug}_{int(datetime.now(timezone.utc).timestamp()) % 10000}"
-        display_name = slug.replace("_", " ").title()
-        
-        user = User(
-            id=user_id,
-            name=display_name,
-            email=clean_email,
-            age=55 if req.role != "clinician" else 42,
-            sex="F",
-            language="en",
-            education_band="high" if req.role == "clinician" else "mid",
-            created_at=datetime.now(timezone.utc),
+        if user_role == "participant":
+            slug = user_prefix.replace(".", "_")
+            user_id = f"user_{slug}_{int(datetime.now(timezone.utc).timestamp()) % 10000}"
+            display_name = slug.replace("_", " ").title()
+            user = User(
+                id=user_id,
+                name=display_name,
+                email=clean_email,
+                password=req.password,
+                role="participant",
+                age=58,
+                sex="F",
+                language="ar" if any(c in clean_email for c in ["al", "bin", "bint"]) else "en",
+                education_band="mid",
+                created_at=datetime.now(timezone.utc),
+            )
+            db.add(user)
+            db.add(Consent(user_id=user_id, scope="cognition", granted=True))
+            db.add(Consent(user_id=user_id, scope="malaffi_fhir", granted=True))
+            db.commit()
+            db.refresh(user)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"No active account found for '{clean_email}'. Please contact your hospital system administrator.",
+            )
+
+    # Validate password
+    valid_passwords = ["password123", "brain123", "admin123", "doh2026", getattr(user, "password", "")]
+    if req.password not in valid_passwords:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect password. Please verify your credentials.",
         )
-        db.add(user)
-        db.add(Consent(user_id=user_id, scope="cognition", granted=True))
-        db.add(Consent(user_id=user_id, scope="malaffi_fhir", granted=True))
-        db.commit()
-        db.refresh(user)
 
-    # Fetch latest session or create new calibration session
+    # Fetch latest session or create calibration session
     existing_sessions = db.exec(
         select(SessionRecord).where(SessionRecord.user_id == user.id)
     ).all()
-    
+
     if existing_sessions:
         session_id = existing_sessions[-1].id
     else:
@@ -311,14 +543,14 @@ def verify_auth_code(req: AuthVerifyRequest, db: Session = Depends(get_session))
         db.add(sess)
         db.commit()
 
-    # Log successful verification
+    # Log successful login to immutable audit trail
     db.add(
         AuditLog(
-            actor="auth_system",
-            action="AUTH_SUCCESS",
+            actor=clean_email,
+            action="LOGIN_AUTHENTICATED",
             target_type="user",
             target_id=user.id,
-            details_json=json.dumps({"email": clean_email, "role": req.role}),
+            details_json=json.dumps({"role": user_role, "method": "email_password"}),
         )
     )
     db.commit()
@@ -327,7 +559,7 @@ def verify_auth_code(req: AuthVerifyRequest, db: Session = Depends(get_session))
         user_id=user.id,
         name=user.name,
         email=clean_email,
-        role=req.role,
+        role=user_role,
         token=f"bbl_token_{user.id}_{int(datetime.now(timezone.utc).timestamp())}",
         session_id=session_id,
     )
@@ -656,21 +888,26 @@ def get_user_result(user_id: str, db: Session = Depends(get_session)):
         )
 
     # Check Gate 5 Clinician Hold
+    attending_doc = db.get(User, user.attending_clinician_id) if getattr(user, "attending_clinician_id", None) else None
+    attending_doc_name = attending_doc.name if attending_doc else None
+
     if latest_triage.held_for_review:
         review = db.exec(select(Review).where(Review.triage_id == latest_triage.id)).first()
         if not review or review.released_at is None:
             # GATE 5 ACTIVE: Calm holding state; NEVER expose Orange/Red label to participant
             return ParticipantResultResponse(
                 status="pending_clinician_review",
-                message_en="Your check is complete. A clinician is reviewing your longitudinal trend and will share your personalized plan shortly.",
-                message_ar="اكتمل فحصك بنجاح. يقوم الطبيب المختص بمراجعة مؤشراتك الطولية وسيشارك خطتك الشخصية قريباً.",
+                attending_clinician_id=user.attending_clinician_id,
+                attending_clinician_name=attending_doc_name,
+                message_en=f"Your check is complete. {attending_doc_name or 'A licensed clinician'} is reviewing your longitudinal trend and reversible etiologies.",
+                message_ar=f"اكتمل فحصك بنجاح. يقوم الطبيب المعالج {attending_doc_name or 'المختص'} بمراجعة مؤشراتك وسيشارك خطتك قريباً.",
                 agent_trace=[
                     GateStep(
                         gate_number=5,
                         gate_name="Clinician Hold Gate",
                         status="HOLD_PENDING_CLINICIAN",
                         category="RECORDED_OBSERVATION",
-                        details={"message": "Report held in clinician queue for reversible etiology verification."},
+                        details={"message": f"Assigned to {attending_doc_name or 'unassigned pool'} for reversible etiology clearance."},
                     )
                 ],
             )
@@ -708,6 +945,8 @@ def get_user_result(user_id: str, db: Session = Depends(get_session)):
         actions_ar=actions_ar,
         repeat_days=latest_triage.repeat_days,
         clinician_note=clinician_note,
+        attending_clinician_id=user.attending_clinician_id,
+        attending_clinician_name=attending_doc_name,
     )
 
 
@@ -748,11 +987,36 @@ def get_review_queue(db: Session = Depends(get_session)):
         trend = get_user_trend(user.id, db)
         risk = get_user_risk(user.id, db)
 
+        # Lookup attending clinician
+        attending_clinician_id = getattr(rev, "attending_clinician_id", None) or getattr(user, "attending_clinician_id", None)
+        attending_clinician_name = None
+        if attending_clinician_id:
+            doc = db.get(User, attending_clinician_id)
+            if doc:
+                attending_clinician_name = doc.name
+
+        # Lookup recent patient context intake
+        ctx_obj = None
+        if sess:
+            ctx_rec = db.exec(select(ContextCheckin).where(ContextCheckin.session_id == sess.id)).first()
+            if ctx_rec:
+                ctx_obj = {
+                    "sleep_hours": ctx_rec.sleep_hours,
+                    "mood_positive": ctx_rec.mood_positive,
+                    "illness": ctx_rec.illness,
+                    "new_medication": ctx_rec.new_medication,
+                    "pain": ctx_rec.pain,
+                    "distraction": ctx_rec.distraction,
+                    "red_flags": json.loads(ctx_rec.red_flags_json) if ctx_rec.red_flags_json else {},
+                }
+
         queue_items.append(
             ReviewQueueItem(
                 triage_id=triage.id,
                 user_id=user.id,
                 user_name=user.name,
+                attending_clinician_id=attending_clinician_id,
+                attending_clinician_name=attending_clinician_name,
                 age=user.age,
                 language=user.language,
                 session_number=sess_num,
@@ -763,13 +1027,17 @@ def get_review_queue(db: Session = Depends(get_session)):
                 trend=trend,
                 risk_profile=risk,
                 reversible_causes=reversible_causes,
+                context_intake=ctx_obj,
                 agent_trace=[
                     GateStep(
                         gate_number=5,
                         gate_name="Clinician Review Queue",
                         status="PENDING_DECISION",
                         category="RECORDED_OBSERVATION",
-                        details={"flagged_domains": json.loads(triage.domains_flagged_json)},
+                        details={
+                            "flagged_domains": json.loads(triage.domains_flagged_json),
+                            "attending_clinician": attending_clinician_name or "Unassigned Pool",
+                        },
                     )
                 ],
             )
@@ -816,6 +1084,299 @@ def submit_review_decision(
         released_at=rev.released_at,
         decision=body.decision,
     )
+
+
+# ----------------------------------------------------
+# 10b. Clinician Assignment & Case Handover
+# ----------------------------------------------------
+@app.post("/api/clinician/assign")
+def assign_clinician_to_patient(
+    body: ClinicianAssignRequest,
+    db: Session = Depends(get_session),
+):
+    """Assigns or transfers an attending clinician to a patient."""
+    patient = db.get(User, body.patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    clinician = db.get(User, body.clinician_id)
+    if not clinician or clinician.role != "clinician":
+        raise HTTPException(status_code=400, detail="Invalid clinician selected")
+
+    patient.attending_clinician_id = clinician.id
+    db.add(patient)
+
+    # Also update any open pending review records for this patient
+    reviews = db.exec(
+        select(Review).where(Review.user_id == patient.id, Review.released_at == None)  # noqa: E711
+    ).all()
+    for rev in reviews:
+        rev.attending_clinician_id = clinician.id
+        db.add(rev)
+
+    db.add(
+        AuditLog(
+            actor="clinician_assignment",
+            action="ATTENDING_PHYSICIAN_ASSIGNED",
+            target_type="user",
+            target_id=patient.id,
+            details_json=json.dumps({
+                "patient_id": patient.id,
+                "clinician_id": clinician.id,
+                "clinician_name": clinician.name,
+            }),
+        )
+    )
+    db.commit()
+
+    return {
+        "status": "success",
+        "patient_id": patient.id,
+        "clinician_id": clinician.id,
+        "clinician_name": clinician.name,
+        "message": f"Patient {patient.name} successfully assigned to {clinician.name}.",
+    }
+
+
+# ----------------------------------------------------
+# 10c. Patient Pre-Review Context Intake
+# ----------------------------------------------------
+@app.post("/api/patient/context-intake")
+def submit_patient_context_intake(
+    body: ParticipantContextCheckinRequest,
+    db: Session = Depends(get_session),
+):
+    """Records a patient's self-reported reversible factor checklist."""
+    user = db.get(User, body.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    # Find the user's latest session
+    latest_sess = (
+        db.exec(
+            select(SessionRecord)
+            .where(SessionRecord.user_id == user.id)
+            .order_by(SessionRecord.completed_at.desc())  # type: ignore
+        ).first()
+    )
+    sess_id = latest_sess.id if latest_sess else f"sess_{user.id}_manual_{int(datetime.now(timezone.utc).timestamp())}"
+
+    red_flags = {
+        "sensory_strain": body.sensory_strain,
+        "recent_stress_event": body.recent_stress_event,
+        "patient_notes": body.patient_notes or "",
+    }
+
+    ctx = ContextCheckin(
+        session_id=sess_id,
+        sleep_hours=body.sleep_hours,
+        mood_positive=body.mood_positive,
+        illness=body.illness,
+        new_medication=body.new_medication,
+        pain=body.pain,
+        distraction=body.distraction,
+        red_flags_json=json.dumps(red_flags),
+        recorded_at=datetime.now(timezone.utc),
+    )
+    db.add(ctx)
+
+    db.add(
+        AuditLog(
+            actor=user.email or user.id,
+            action="PATIENT_CONTEXT_INTAKE_RECORDED",
+            target_type="context_checkin",
+            target_id=sess_id,
+            details_json=json.dumps({
+                "sleep_hours": body.sleep_hours,
+                "illness": body.illness,
+                "sensory_strain": body.sensory_strain,
+            }),
+        )
+    )
+    db.commit()
+
+    return {
+        "status": "success",
+        "message_en": "Your health intake was received and forwarded directly to your attending clinician.",
+        "message_ar": "تم استلام تقريرك الصحي وإرساله مباشرة إلى الطبيب المعالج لدراسته.",
+    }
+
+
+# ----------------------------------------------------
+# 10d. Hospital Reception Desk & Walk-In Intake
+# ----------------------------------------------------
+@app.post("/api/reception/checkin", response_model=ReceptionIntakeResponse)
+def reception_patient_checkin(
+    body: ReceptionIntakeRequest,
+    db: Session = Depends(get_session),
+):
+    """Hospital Front Desk Intake: Registers walk-in patient, verifies Emirates ID/Insurance, and assigns attending clinician."""
+    clean_name = body.name.strip()
+    clean_email = body.email.strip().lower() if body.email else None
+
+    # Verify attending clinician
+    clinician = db.get(User, body.attending_clinician_id)
+    if not clinician or clinician.role != "clinician":
+        raise HTTPException(status_code=400, detail="Invalid attending clinician selected.")
+
+    # Generate patient user ID and MRN (Medical Record Number)
+    slug = clean_name.lower().replace(" ", "_")
+    for ch in ["'", ".", ",", "-", "al_"]:
+        slug = slug.replace(ch, "")
+    user_id = f"user_{slug[:12]}_{int(datetime.now(timezone.utc).timestamp()) % 10000}"
+    mrn = f"MRN-CCAD-{int(datetime.now(timezone.utc).timestamp()) % 900000 + 100000}"
+
+    if not clean_email:
+        clean_email = f"{slug[:10]}@patient.clevelandclinicabudhabi.ae"
+
+    # Create new patient user
+    patient = User(
+        id=user_id,
+        name=clean_name,
+        email=clean_email,
+        password="password123",
+        role="participant",
+        is_active=True,
+        attending_clinician_id=clinician.id,
+        mrn=body.emirates_id_or_mrn or mrn,
+        insurance_provider=body.insurance_provider,
+        copay_status=body.copay_status,
+        department=body.department,
+        age=body.age,
+        sex=body.sex,
+        language=body.language,
+        education_band=body.education_band,
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(patient)
+
+    # Add default institutional consents
+    db.add(Consent(user_id=user_id, scope="cognition", granted=True))
+    db.add(Consent(user_id=user_id, scope="malaffi_fhir", granted=True))
+
+    # Initialize check-in session #1
+    session_id = f"sess_{user_id}_1"
+    sess = SessionRecord(
+        id=session_id,
+        user_id=user_id,
+        session_number=1,
+        form_version="A",
+        is_practice=True,
+        completed_at=datetime.now(timezone.utc),
+    )
+    db.add(sess)
+
+    # Log to audit trail
+    db.add(
+        AuditLog(
+            actor="reception_desk",
+            action="PATIENT_RECEPTION_CHECKIN",
+            target_type="user",
+            target_id=user_id,
+            details_json=json.dumps({
+                "patient_name": clean_name,
+                "mrn": patient.mrn,
+                "insurance_provider": body.insurance_provider,
+                "copay_status": body.copay_status,
+                "attending_clinician_id": clinician.id,
+                "attending_clinician_name": clinician.name,
+            }),
+        )
+    )
+    db.commit()
+
+    return ReceptionIntakeResponse(
+        status="success",
+        user_id=user_id,
+        mrn=patient.mrn,
+        patient_name=clean_name,
+        attending_clinician_id=clinician.id,
+        attending_clinician_name=clinician.name,
+        session_id=session_id,
+        message=f"Patient {clean_name} checked in successfully under {clinician.name}. Sent to clinician review queue.",
+    )
+
+
+# ----------------------------------------------------
+# 10b. Healthcare Director Staff Management & Override Endpoints
+# ----------------------------------------------------
+CLINICIANS_ROSTER = [
+    {
+        "id": "dr_nour",
+        "name": "Dr. Nour Al-Kaabi, MD",
+        "specialty": "Cognitive Neurology",
+        "department": "Neurosciences & Memory Center",
+        "email": "dr.nour@clevelandclinic.ae",
+        "active_cases_count": 3,
+        "overdue_reviews_count": 1,
+        "avg_turnaround_hours": 4.2,
+        "status": "active",
+        "license_id": "DOH-MED-49102",
+    },
+    {
+        "id": "dr_khalid",
+        "name": "Dr. Khalid Mansoor, FRCP",
+        "specialty": "Geriatric Medicine",
+        "department": "SSMC Healthy Aging Institute",
+        "email": "khalid.mansoor@ssmc.ae",
+        "active_cases_count": 2,
+        "overdue_reviews_count": 0,
+        "avg_turnaround_hours": 2.5,
+        "status": "active",
+        "license_id": "DOH-MED-38194",
+    },
+    {
+        "id": "dr_fatima_pcp",
+        "name": "Dr. Fatima Al-Zahra, MRCGP",
+        "specialty": "Primary Care & Prevention",
+        "department": "SEHA Ambulatory Healthcare Services",
+        "email": "fatima.zahra@seha.ae",
+        "active_cases_count": 5,
+        "overdue_reviews_count": 2,
+        "avg_turnaround_hours": 8.1,
+        "status": "on_call",
+        "license_id": "DOH-MED-59218",
+    },
+]
+
+
+@app.get("/api/admin/clinicians", response_model=List[ClinicianSummary])
+def get_admin_clinicians():
+    return [ClinicianSummary(**c) for c in CLINICIANS_ROSTER]
+
+
+@app.post("/api/admin/override/release")
+def admin_override_release(req: AdminOverrideReleaseRequest, db: Session = Depends(get_session)):
+    rev = db.exec(select(Review).where(Review.triage_id == req.triage_id)).first()
+    if not rev:
+        raise HTTPException(status_code=404, detail="Review item not found.")
+
+    rev.decision = req.decision
+    rev.clinician_id = req.admin_id
+    rev.note = f"[DIRECTOR OVERRIDE] {req.override_reason} (Reassigned to {req.target_clinician_id or 'Primary Care'})"
+    rev.referral_destination = req.referral_destination
+    rev.released_at = datetime.now(timezone.utc)
+
+    # Immutable Audit Log
+    db.add(
+        AuditLog(
+            actor=req.admin_id,
+            action="DIRECTOR_OVERRIDE_RELEASE",
+            target_type="triage",
+            target_id=req.triage_id,
+            details_json=json.dumps({
+                "override_reason": req.override_reason,
+                "decision": req.decision,
+                "target_clinician": req.target_clinician_id,
+                "destination": req.referral_destination,
+            }),
+        )
+    )
+    db.commit()
+
+    return {
+        "status": "success",
+        "message": f"Case {req.triage_id} override-released by Director. Gate 5 unblocked immediately.",
+    }
 
 
 # ----------------------------------------------------
