@@ -98,8 +98,8 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-140px)] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+    <div className="py-6 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Narrative */}
         <div className="lg:col-span-5 space-y-5">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-teal-50 dark:bg-teal-950/60 text-teal-800 dark:text-teal-300 text-xs font-semibold">
