@@ -57,6 +57,8 @@ export default function AuthPage() {
         router.push("/director");
       } else if (res.role === "admin") {
         router.push("/admin");
+      } else if (res.role === "receptionist") {
+        router.push("/reception");
       } else {
         router.push("/result");
       }

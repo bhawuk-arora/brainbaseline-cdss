@@ -437,6 +437,8 @@ def login_with_password(req: AuthLoginRequest, db: Session = Depends(get_session
             or "fatima" in user_prefix
         ):
             resolved_role = "clinician"
+        elif "reception" in user_prefix or "admissions" in user_prefix or "desk" in user_prefix:
+            resolved_role = "receptionist"
         else:
             resolved_role = "participant"
 
