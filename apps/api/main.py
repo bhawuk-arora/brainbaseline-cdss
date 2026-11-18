@@ -1267,6 +1267,40 @@ def reception_patient_checkin(
     )
     db.add(sess)
 
+    # Automatically create the initial Gate 5 Clinical Review hold so the patient appears in the doctor's queue
+    triage_id = f"triage_{session_id}"
+    triage = Triage(
+        id=triage_id,
+        session_id=session_id,
+        user_id=user_id,
+        color="orange",
+        urgent_emergency=False,
+        held_for_review=True,
+        reasons_json=json.dumps([
+            f"Admissions Walk-In: Initial Cognitive Screening & Baseline Intake assigned to {clinician.name}.",
+            f"Verified under {body.insurance_provider} (MRN: {patient.mrn}). Reversible factor check required.",
+        ]),
+        domains_flagged_json=json.dumps(["memory", "attention_rt"]),
+        confidence="high",
+        repeat_days=90,
+    )
+    db.add(triage)
+
+    # Create the pending review in the clinician's review queue
+    review = Review(
+        triage_id=triage_id,
+        user_id=user_id,
+        attending_clinician_id=clinician.id,
+        clinician_id=clinician.id,
+        decision=None,
+        note=None,
+        checked_causes_json="[]",
+        referral_destination=None,
+        released_at=None,
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(review)
+
     # Log to audit trail
     db.add(
         AuditLog(
