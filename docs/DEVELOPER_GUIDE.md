@@ -165,4 +165,28 @@ pytest tests/test_api.py -v
 | `DATABASE_URL` | `sqlite:///brainbaseline.db` | Connection string for SQLite database (WAL mode automatically enabled). |
 | `PORT` | `8000` (API) / `3000` (Web) | Local listening port. |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Backend API base URL consumed by the Next.js client. |
-| `PYTHONPATH` | `/app` | Ensures root packaging resolution in Docker. |
+### 8. Scalable Enterprise ID Conventions & Seeded Cohort
+
+The platform implements unified, scalable hospital identifier prefixes across all models, endpoints, and UI views:
+
+| Role / Entity | Prefix Convention | Example ID | Purpose |
+| :--- | :--- | :--- | :--- |
+| **Patients & Participants** | `PAT-{HEX}` / `PAT-{NUM}` | `PAT-0042`, `PAT-A91B02` | Standardized outpatient / participant identification. |
+| **Licensed Clinicians (Doctors)** | `DOC-{NAME}` / `DOC-{HEX}` | `DOC-NOUR`, `DOC-KHALID` | Attending physician review queue routing. |
+| **Hospital Medical Directors** | `DIR-{ENTITY}` | `DIR-DOH`, `DIR-SEHA` | Executive clinical override and SLA governance. |
+| **Reception / Admissions Staff** | `REC-{LOCATION}` | `REC-CCAD`, `REC-SEHA` | Front desk intake & MRN issuance tracking. |
+| **System Administrators** | `ADM-{ENTITY}` | `ADM-DOH` | Audit inspection, IAM, and synthetic benchmarks. |
+
+The database seeder (`apps/api/seed_patients.py`) generates a diverse cohort of 100+ longitudinal patient records with complete trajectories (Green 60%, Yellow 15%, Baseline 15%, Orange 8%, Red 2%) for stress-testing and clinical validation.
+
+---
+
+### 9. Reception Desk Admissions & Front Desk Resolver
+
+1. **Intake & Clinician Dispatch**:
+   * Outpatients are checked in via `POST /api/reception/checkin`.
+   * Automatically assigns an attending specialist (`attending_clinician_id`), generates an institutional MRN (`MRN-CCAD-XXXXXX`), sets up Session #1, and enqueues a baseline review.
+2. **Registration Track (`GET /api/reception/registered-patients`)**:
+   * Logs every front-desk registration with timestamp, patient name, MRN, insurance, co-pay status, and assigned doctor.
+3. **Problem Resolver SOPs**:
+   * Front desk standard operating procedures for expired Emirates IDs, Malaffi HIE digital consent, Thiqa 100% co-pay exemptions, shift changes, and Arabic dialect accompaniment.

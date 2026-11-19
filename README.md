@@ -255,6 +255,13 @@ All endpoints return strictly typed JSON schemas:
 | :--- | :--- | :--- |
 | `GET` | `/api/health` | Returns service health status and version. |
 | `GET` | `/api/users` | Lists all seeded personas with triage status and review flags. |
+| `POST` | `/api/auth/login` | Production institutional email & password authentication with automated role resolution. |
+| `POST` | `/api/admin/iam/users` | Health Authority centralized IAM endpoint to register patients, doctors, directors, receptionists, or admins. |
+| `PATCH` | `/api/admin/iam/users/{id}` | Updates user profile and toggles `is_active` (account deactivation/reactivation). |
+| `DELETE` | `/api/admin/iam/users/{id}` | Permanently deletes user with cascade cleanup across sessions, findings, and triages. |
+| `POST` | `/api/reception/checkin` | Reception desk walk-in intake, MRN issuance, and attending physician queue dispatch. |
+| `GET` | `/api/reception/registered-patients` | Real-time reception registration audit track of all checked-in patients. |
+| `GET` | `/api/admin/clinicians` | Returns live clinician roster with department, active queue load, and license status. |
 | `GET` | `/api/users/{id}/consent` | Retrieves consent records by scope (`cognition`, `malaffi_fhir`). |
 | `POST` | `/api/consent` | Updates user consent; triggers immediate audit log. |
 | `POST` | `/api/sessions` | Initializes a new screening session (increments session count, selects form A–D). |
@@ -262,7 +269,7 @@ All endpoints return strictly typed JSON schemas:
 | `POST` | `/api/import/fhir` | Ingests simulated Malaffi / FHIR R4 wearable & clinical risk bundles. |
 | `GET` | `/api/users/{id}/trend` | Returns longitudinal points + shaded $\pm 1.5$ SD baseline bands. |
 | `GET` | `/api/users/{id}/risk` | Returns modifiable risk points, tier, and repeat interval. |
-| `GET` | `/api/users/{id}/result` | Participant endpoint. **Enforces Gate 5 hold** if review is pending. |
+| `GET` | `/api/users/{id}/result` | Participant endpoint. **Enforces Gate 5 hold** if review is pending; includes past check-in appointments history. |
 | `GET` | `/api/review/queue` | Clinician console queue of held Orange/Red cases with CDS traces. |
 | `POST` | `/api/review/{id}/decision` | Clinician decision (`approve`, `edit`, `escalate`); unlocks `/result`. |
 | `GET` | `/api/admin/audit` | Returns latest 100 immutable audit log entries. |
