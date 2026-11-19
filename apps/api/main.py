@@ -6,6 +6,7 @@ audit logging, clinician review queue, and longitudinal trend analytics.
 
 import os
 import json
+import uuid
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
@@ -160,8 +161,15 @@ def admin_create_iam_user(req: IAMUserCreateRequest, db: Session = Depends(get_s
     if existing:
         raise HTTPException(status_code=400, detail=f"User with email '{clean_email}' already exists.")
 
-    slug = re.sub(r"[^a-zA-Z0-9]+", "_", req.name.strip().lower())
-    user_id = f"user_{slug}_{int(datetime.now(timezone.utc).timestamp()) % 100000}"
+    prefix = {
+        "participant": "PAT",
+        "clinician": "DOC",
+        "director": "DIR",
+        "admin": "ADM",
+        "receptionist": "REC",
+    }.get(req.role, "USR")
+    rand_suffix = uuid.uuid4().hex[:6].upper()
+    user_id = f"{prefix}-{rand_suffix}"
 
     new_user = User(
         id=user_id,
@@ -264,10 +272,54 @@ def admin_update_iam_user(user_id: str, req: IAMUserUpdateRequest, db: Session =
 
 
 @app.delete("/api/admin/iam/users/{user_id}")
-def admin_deactivate_iam_user(user_id: str, admin_actor: str = "admin@doh.gov.ae", db: Session = Depends(get_session)):
+def admin_deactivate_or_delete_iam_user(
+    user_id: str,
+    hard_delete: bool = False,
+    admin_actor: str = "admin@doh.gov.ae",
+    db: Session = Depends(get_session)
+):
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
+
+    user_name = user.name
+
+    if hard_delete:
+        # Cascade delete all related records safely
+        sessions = db.exec(select(SessionRecord).where(SessionRecord.user_id == user_id)).all()
+        for sess in sessions:
+            db.exec(select(TaskResult).where(TaskResult.session_id == sess.id))
+            for item in db.exec(select(TaskResult).where(TaskResult.session_id == sess.id)).all():
+                db.delete(item)
+            for item in db.exec(select(Finding).where(Finding.session_id == sess.id)).all():
+                db.delete(item)
+            for item in db.exec(select(ContextCheckin).where(ContextCheckin.session_id == sess.id)).all():
+                db.delete(item)
+            for item in db.exec(select(FunctionReport).where(FunctionReport.session_id == sess.id)).all():
+                db.delete(item)
+            db.delete(sess)
+
+        for item in db.exec(select(Triage).where(Triage.user_id == user_id)).all():
+            db.delete(item)
+        for item in db.exec(select(Review).where(Review.user_id == user_id)).all():
+            db.delete(item)
+        for item in db.exec(select(Consent).where(Consent.user_id == user_id)).all():
+            db.delete(item)
+        for item in db.exec(select(RiskProfile).where(RiskProfile.user_id == user_id)).all():
+            db.delete(item)
+
+        db.delete(user)
+        db.add(
+            AuditLog(
+                actor=admin_actor,
+                action="IAM_USER_DELETED_PERMANENTLY",
+                target_type="user",
+                target_id=user_id,
+                details_json=json.dumps({"reason": "Permanently deleted by Health Authority Administrator", "user_name": user_name}),
+            )
+        )
+        db.commit()
+        return {"status": "success", "message": f"User {user_name} ({user_id}) and associated clinical data deleted permanently."}
 
     user.is_active = False
     db.add(user)
@@ -291,8 +343,15 @@ def admin_deactivate_iam_user(user_id: str, admin_actor: str = "admin@doh.gov.ae
 def onboard_patient(req: PatientOnboardRequest, db: Session = Depends(get_session)):
     import re
     # Clean unique user ID based on name or timestamp
-    slug = re.sub(r"[^a-zA-Z0-9]+", "_", req.name.strip().lower())
-    user_id = f"user_{slug}_{int(datetime.now(timezone.utc).timestamp()) % 100000}"
+    prefix = {
+        "participant": "PAT",
+        "clinician": "DOC",
+        "director": "DIR",
+        "admin": "ADM",
+        "receptionist": "REC",
+    }.get(req.role, "USR")
+    rand_suffix = uuid.uuid4().hex[:6].upper()
+    user_id = f"{prefix}-{rand_suffix}"
 
     # 1. Register User in Database
     new_user = User(
@@ -313,7 +372,7 @@ def onboard_patient(req: PatientOnboardRequest, db: Session = Depends(get_sessio
         db.add(Consent(user_id=user_id, scope="malaffi_fhir", granted=True))
 
     # 3. Create Session 1 (Calibration Mode)
-    session_id = f"sess_{user_id}_1_{int(datetime.now(timezone.utc).timestamp())}"
+    session_id = f"sess_{user_id}_1_{uuid.uuid4().hex[:8]}"
     sess = SessionRecord(
         id=session_id,
         user_id=user_id,
@@ -533,7 +592,7 @@ def login_with_password(req: AuthLoginRequest, db: Session = Depends(get_session
     if existing_sessions:
         session_id = existing_sessions[-1].id
     else:
-        session_id = f"sess_{user.id}_1_{int(datetime.now(timezone.utc).timestamp())}"
+        session_id = f"sess_{user.id}_1_{uuid.uuid4().hex[:8]}"
         sess = SessionRecord(
             id=session_id,
             user_id=user.id,
@@ -625,7 +684,7 @@ def initialize_session(body: SessionInitBody, db: Session = Depends(get_session)
     next_num = len(existing_sessions) + 1
     form_ver = ["A", "B", "C", "D"][(next_num - 1) % 4]
     is_practice = next_num == 1
-    session_id = f"sess_{body.user_id}_{next_num}_{int(datetime.now(timezone.utc).timestamp())}"
+    session_id = f"sess_{body.user_id}_{next_num}_{uuid.uuid4().hex[:8]}"
 
     sess = SessionRecord(
         id=session_id,
@@ -1160,7 +1219,7 @@ def submit_patient_context_intake(
             .order_by(SessionRecord.completed_at.desc())  # type: ignore
         ).first()
     )
-    sess_id = latest_sess.id if latest_sess else f"sess_{user.id}_manual_{int(datetime.now(timezone.utc).timestamp())}"
+    sess_id = latest_sess.id if latest_sess else f"sess_{user.id}_manual_{uuid.uuid4().hex[:8]}"
 
     red_flags = {
         "sensory_strain": body.sensory_strain,
@@ -1220,11 +1279,9 @@ def reception_patient_checkin(
     if not clinician or clinician.role != "clinician":
         raise HTTPException(status_code=400, detail="Invalid attending clinician selected.")
 
-    # Generate patient user ID and MRN (Medical Record Number)
-    slug = clean_name.lower().replace(" ", "_")
-    for ch in ["'", ".", ",", "-", "al_"]:
-        slug = slug.replace(ch, "")
-    user_id = f"user_{slug[:12]}_{int(datetime.now(timezone.utc).timestamp()) % 10000}"
+    # Generate scalable patient user ID and MRN (Medical Record Number)
+    rand_suffix = uuid.uuid4().hex[:6].upper()
+    user_id = f"PAT-{rand_suffix}"
     mrn = f"MRN-CCAD-{int(datetime.now(timezone.utc).timestamp()) % 900000 + 100000}"
 
     if not clean_email:
@@ -1302,9 +1359,10 @@ def reception_patient_checkin(
     db.add(review)
 
     # Log to audit trail
+    actor_id = getattr(body, "receptionist_id", None) or "staff_reception_ccad"
     db.add(
         AuditLog(
-            actor="reception_desk",
+            actor=actor_id,
             action="PATIENT_RECEPTION_CHECKIN",
             target_type="user",
             target_id=user_id,
@@ -1315,6 +1373,8 @@ def reception_patient_checkin(
                 "copay_status": body.copay_status,
                 "attending_clinician_id": clinician.id,
                 "attending_clinician_name": clinician.name,
+                "registered_by": actor_id,
+                "created_at": datetime.now(timezone.utc).isoformat(),
             }),
         )
     )
@@ -1330,6 +1390,42 @@ def reception_patient_checkin(
         session_id=session_id,
         message=f"Patient {clean_name} checked in successfully under {clinician.name}. Sent to clinician review queue.",
     )
+
+
+@app.get("/api/reception/registered-patients")
+def get_reception_registered_patients(receptionist_id: Optional[str] = None, db: Session = Depends(get_session)):
+    """Returns patient registrations recorded by reception desks."""
+    logs = db.exec(
+        select(AuditLog)
+        .where(AuditLog.action == "PATIENT_RECEPTION_CHECKIN")
+        .order_by(AuditLog.timestamp.desc()) # type: ignore
+    ).all()
+
+    records = []
+    for log in logs:
+        try:
+            details = json.loads(log.details_json)
+        except Exception:
+            details = {}
+
+        if receptionist_id and log.actor != receptionist_id:
+            continue
+
+        patient = db.get(User, log.target_id)
+        records.append({
+            "log_id": log.id,
+            "patient_id": log.target_id,
+            "patient_name": details.get("patient_name", patient.name if patient else "Unknown"),
+            "mrn": details.get("mrn", patient.mrn if patient else ""),
+            "insurance_provider": details.get("insurance_provider", ""),
+            "copay_status": details.get("copay_status", "completed"),
+            "attending_clinician_id": details.get("attending_clinician_id", ""),
+            "attending_clinician_name": details.get("attending_clinician_name", ""),
+            "registered_by": log.actor,
+            "timestamp": log.timestamp.isoformat() if log.timestamp else datetime.now(timezone.utc).isoformat(),
+            "is_active": patient.is_active if patient else True,
+        })
+    return records
 
 
 # ----------------------------------------------------
@@ -1361,7 +1457,7 @@ CLINICIANS_ROSTER = [
         "license_id": "DOH-MED-38194",
     },
     {
-        "id": "dr_fatima_pcp",
+        "id": "dr_fatima",
         "name": "Dr. Fatima Al-Zahra, MRCGP",
         "specialty": "Primary Care & Prevention",
         "department": "SEHA Ambulatory Healthcare Services",
@@ -1372,12 +1468,60 @@ CLINICIANS_ROSTER = [
         "status": "on_call",
         "license_id": "DOH-MED-59218",
     },
+    {
+        "id": "dr_zayed",
+        "name": "Dr. Zayed Al-Dhaheri, MD",
+        "specialty": "Clinical Neuropsychology",
+        "department": "Abu Dhabi Brain & Spine Center",
+        "email": "zayed.dhaheri@clevelandclinic.ae",
+        "active_cases_count": 1,
+        "overdue_reviews_count": 0,
+        "avg_turnaround_hours": 3.0,
+        "status": "active",
+        "license_id": "DOH-MED-62180",
+    },
+    {
+        "id": "dr_amna",
+        "name": "Dr. Amna Al-Shamsi, MD",
+        "specialty": "Sleep Medicine & Neuro-metabolism",
+        "department": "Imperial College London Diabetes / Neuro Center",
+        "email": "amna.shamsi@icldc.ae",
+        "active_cases_count": 4,
+        "overdue_reviews_count": 1,
+        "avg_turnaround_hours": 5.4,
+        "status": "active",
+        "license_id": "DOH-MED-71932",
+    },
+    {
+        "id": "dr_hamad",
+        "name": "Dr. Hamad Al-Suwaidi, PhD",
+        "specialty": "Behavioral Health & Audiology",
+        "department": "SEHA Primary Care Audiology Workup",
+        "email": "hamad.suwaidi@seha.ae",
+        "active_cases_count": 2,
+        "overdue_reviews_count": 0,
+        "avg_turnaround_hours": 3.8,
+        "status": "on_call",
+        "license_id": "DOH-MED-80219",
+    },
 ]
 
 
 @app.get("/api/admin/clinicians", response_model=List[ClinicianSummary])
-def get_admin_clinicians():
-    return [ClinicianSummary(**c) for c in CLINICIANS_ROSTER]
+def get_admin_clinicians(db: Session = Depends(get_session)):
+    clinicians_map = {c["id"]: dict(c) for c in CLINICIANS_ROSTER}
+    # Update with live active cases count
+    for cid in clinicians_map:
+        reviews_count = len(
+            db.exec(
+                select(Review).where(
+                    Review.attending_clinician_id == cid,
+                    Review.released_at == None # type: ignore
+                )
+            ).all()
+        )
+        clinicians_map[cid]["active_cases_count"] = max(clinicians_map[cid]["active_cases_count"], reviews_count)
+    return [ClinicianSummary(**c) for c in clinicians_map.values()]
 
 
 @app.post("/api/admin/override/release")

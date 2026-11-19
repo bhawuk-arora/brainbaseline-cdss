@@ -455,6 +455,9 @@ class ReceptionIntakeRequest(BaseModel):
     sex: str = "F"  # "F" | "M"
     language: str = "en"  # "en" | "ar"
     education_band: str = "mid"  # "low" | "mid" | "high"
+    receptionist_id: Optional[str] = "staff_reception_ccad"
+    chief_complaint: Optional[str] = None
+    triage_priority: Optional[str] = "routine"  # "routine" | "urgent" | "fast_track"
 
 
 class ReceptionIntakeResponse(BaseModel):

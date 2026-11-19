@@ -28,6 +28,15 @@ import {
   AlertOctagon,
   ShieldAlert,
   Hospital,
+  Trash2,
+  UserPlus,
+  Plus,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Power,
+  PowerOff,
+  SlidersHorizontal,
 } from "lucide-react";
 
 export default function AdminPage() {
@@ -42,8 +51,11 @@ export default function AdminPage() {
   }, [isAuthenticated, activeRole, router]);
 
   const [activeTab, setActiveTab] = useState<"directory" | "clinicians" | "benchmark" | "fairness" | "economics" | "audit">("directory");
-  const [filterRole, setFilterRole] = useState<"all" | "patient" | "clinician" | "director">("all");
+  const [filterRole, setFilterRole] = useState<"all" | "participant" | "clinician" | "director" | "admin" | "receptionist">("all");
+  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 15;
   const [benchmark, setBenchmark] = useState<any>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [patients, setPatients] = useState<UserSummary[]>([]);
@@ -61,6 +73,149 @@ export default function AdminPage() {
   const [overrideReason, setOverrideReason] = useState("Escalated review backlog. Director override release to primary care audiology workup.");
   const [overrideDecision, setOverrideDecision] = useState<"approve" | "escalate">("approve");
   const [overrideSuccessMsg, setOverrideSuccessMsg] = useState<string | null>(null);
+
+  // Add User Modal state
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [newUserName, setNewUserName] = useState("");
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("password123");
+  const [newUserRole, setNewUserRole] = useState<"participant" | "clinician" | "director" | "admin" | "receptionist">("participant");
+  const [newUserAge, setNewUserAge] = useState(55);
+  const [newUserSex, setNewUserSex] = useState<"F" | "M">("F");
+  const [newUserLang, setNewUserLang] = useState<"ar" | "en">("ar");
+  const [newUserEdu, setNewUserEdu] = useState<"low" | "mid" | "high">("mid");
+  const [addingUser, setAddingUser] = useState(false);
+  const [addUserError, setAddUserError] = useState<string | null>(null);
+
+  // Delete User confirmation state
+  const [userToDelete, setUserToDelete] = useState<UserSummary | null>(null);
+  const [deletingUser, setDeletingUser] = useState(false);
+  const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserName.trim() || !newUserEmail.trim()) {
+      setAddUserError("Name and email are required.");
+      return;
+    }
+    setAddUserError(null);
+    setAddingUser(true);
+    try {
+      await api.createIAMUser({
+        name: newUserName.trim(),
+        email: newUserEmail.trim(),
+        password: newUserPassword.trim() || "password123",
+        role: newUserRole,
+        age: Number(newUserAge),
+        sex: newUserSex,
+        language: newUserLang,
+        education_band: newUserEdu,
+      });
+      setAddingUser(false);
+      setShowAddUserModal(false);
+      setNewUserName("");
+      setNewUserEmail("");
+      setActionSuccessMsg(`User successfully registered in the platform.`);
+      setTimeout(() => setActionSuccessMsg(null), 4000);
+      loadData();
+    } catch (err: any) {
+      setAddingUser(false);
+      setAddUserError(err.message || "Failed to create user.");
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
+    setDeletingUser(true);
+    try {
+      await api.deleteUser(userToDelete.id, true);
+      setDeletingUser(false);
+      const deletedName = userToDelete.name;
+      setUserToDelete(null);
+      setActionSuccessMsg(`User "${deletedName}" was permanently removed.`);
+      setTimeout(() => setActionSuccessMsg(null), 4000);
+      loadData();
+    } catch (err: any) {
+      setDeletingUser(false);
+      alert(`Failed to delete user: ${err.message || "Unknown error"}`);
+    }
+  };
+
+  const handleToggleDeactivate = async (user: UserSummary) => {
+    try {
+      const nextActive = !user.is_active;
+      await api.updateIAMUser(user.id, { is_active: nextActive });
+      setActionSuccessMsg(
+        nextActive
+          ? `User "${user.name}" has been reactivated.`
+          : `User "${user.name}" has been deactivated.`
+      );
+      setTimeout(() => setActionSuccessMsg(null), 4000);
+      loadData();
+    } catch (err: any) {
+      alert(`Failed to update status: ${err.message || "Unknown error"}`);
+    }
+  };
+
+  const formatScalableId = (id: string, role: string) => {
+    if (id.startsWith("PAT-") || id.startsWith("DOC-") || id.startsWith("DIR-") || id.startsWith("ADM-") || id.startsWith("REC-")) {
+      return id;
+    }
+    if (id.startsWith("patient_")) {
+      return `PAT-${id.replace("patient_", "").padStart(4, "0")}`;
+    }
+    if (id.startsWith("dr_")) {
+      return `DOC-${id.replace("dr_", "").toUpperCase()}`;
+    }
+    if (id.startsWith("director_")) {
+      return `DIR-${id.replace("director_", "").toUpperCase()}`;
+    }
+    if (id.startsWith("admin_")) {
+      return `ADM-${id.replace("admin_", "").toUpperCase()}`;
+    }
+    if (id.startsWith("staff_reception_")) {
+      return `REC-${id.replace("staff_reception_", "").toUpperCase()}`;
+    }
+    if (id.startsWith("user_")) {
+      return `PAT-${id.replace("user_", "").slice(0, 10).toUpperCase()}`;
+    }
+    const prefix = role === "clinician" ? "DOC" : role === "director" ? "DIR" : role === "admin" ? "ADM" : "PAT";
+    return `${prefix}-${id.slice(0, 8).toUpperCase()}`;
+  };
+
+  const filteredUsers = patients.filter((p) => {
+    // Role filter
+    if (filterRole !== "all") {
+      if (p.role !== filterRole) return false;
+    }
+    // Status filter
+    if (filterStatus === "active" && !p.is_active) return false;
+    if (filterStatus === "inactive" && p.is_active) return false;
+
+    // Search query
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const scalableId = formatScalableId(p.id, p.role).toLowerCase();
+      const rawId = p.id.toLowerCase();
+      const name = (p.name || "").toLowerCase();
+      const email = (p.email || "").toLowerCase();
+      return name.includes(q) || email.includes(q) || rawId.includes(q) || scalableId.includes(q);
+    }
+    return true;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
+  const currentPageSafe = Math.min(currentPage, totalPages);
+  const paginatedUsers = filteredUsers.slice((currentPageSafe - 1) * pageSize, currentPageSafe * pageSize);
+
+  const roleCounts = {
+    all: patients.length,
+    participant: patients.filter((p) => p.role === "participant").length,
+    clinician: patients.filter((p) => p.role === "clinician").length,
+    director: patients.filter((p) => p.role === "director").length,
+    receptionist: patients.filter((p) => p.role === "receptionist").length,
+    admin: patients.filter((p) => p.role === "admin").length,
+  };
 
   const loadData = () => {
     setLoading(true);
@@ -262,84 +417,186 @@ export default function AdminPage() {
         ))}
       </div>
 
+      {/* Success Notification */}
+      {actionSuccessMsg && (
+        <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-200 flex items-center justify-between shadow-2xs">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span className="font-semibold">{actionSuccessMsg}</span>
+          </div>
+          <button onClick={() => setActionSuccessMsg(null)} className="text-emerald-600 hover:text-emerald-800">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* TAB 1: CENTRALIZED HEALTH DIRECTORY (DOCTORS & PATIENTS IN ONE UNIFIED VIEW) */}
       {activeTab === "directory" && (
         <div className="space-y-4">
+          {/* Header & Main Controls */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                Centralized Hospital & Patient Directory ({patients.length} Registered Records)
+                Centralized Health Directory
+                <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold font-mono">
+                  {filteredUsers.length} of {patients.length} records
+                </span>
               </h2>
               <p className="text-xs text-slate-500">
-                Unified roster of all patients, attending physicians, and hospital directors indexed by normalized schema.
+                Search, filter, manage, activate/deactivate, and audit accounts with enterprise-standard identifier keys.
               </p>
             </div>
 
             <div className="flex items-center gap-2">
-              {/* Role Filter Chips */}
-              <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl text-xs">
-                {(["all", "patient", "clinician", "director"] as const).map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => setFilterRole(r)}
-                    className={`px-3 py-1 rounded-lg font-medium capitalize transition ${
-                      filterRole === r
-                        ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-bold"
-                        : "text-slate-500 hover:text-slate-900"
-                    }`}
-                  >
-                    {r === "all" ? "All Users" : `${r}s`}
-                  </button>
-                ))}
-              </div>
+              <button
+                onClick={() => setShowAddUserModal(true)}
+                className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 font-semibold text-xs transition flex items-center gap-1.5 shadow-2xs"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>+ Add User</span>
+              </button>
 
               <button
                 onClick={() => router.push("/onboard")}
-                className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-medium text-xs transition shadow-2xs"
+                className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs transition shadow-2xs"
               >
-                + Onboard New Patient
+                + Onboard Patient
               </button>
             </div>
           </div>
 
+          {/* Search & Filter Tooling Bar */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+            {/* Search Input */}
+            <div className="relative min-w-[240px] flex-1 max-w-md">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="Search by name, email, or ID (e.g. PAT-0012, Layla)..."
+                className="w-full text-xs pl-9 pr-3.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-slate-900"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-2.5 text-xs text-slate-400 hover:text-slate-600"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {/* Segregated Filters */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Role Segregation Chips */}
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-xs">
+                {[
+                  { key: "all", label: `All (${roleCounts.all})` },
+                  { key: "participant", label: `Patients (${roleCounts.participant})` },
+                  { key: "clinician", label: `Doctors (${roleCounts.clinician})` },
+                  { key: "director", label: `Directors (${roleCounts.director})` },
+                  { key: "admin", label: `Admins (${roleCounts.admin})` },
+                ].map((r) => (
+                  <button
+                    key={r.key}
+                    onClick={() => {
+                      setFilterRole(r.key as any);
+                      setCurrentPage(1);
+                    }}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition ${
+                      filterRole === r.key
+                        ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-bold"
+                        : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Status Filter */}
+              <select
+                value={filterStatus}
+                onChange={(e) => {
+                  setFilterStatus(e.target.value as any);
+                  setCurrentPage(1);
+                }}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 outline-none"
+              >
+                <option value="all">All Statuses</option>
+                <option value="active">Active Only</option>
+                <option value="inactive">Deactivated Only</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Directory Table */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-800 text-slate-500 uppercase tracking-wider text-[10px]">
                 <tr>
+                  <th className="p-3.5">Scalable ID</th>
                   <th className="p-3.5">Name</th>
-                  <th className="p-3.5">Assigned Role</th>
-                  <th className="p-3.5">Email / Identifier</th>
-                  <th className="p-3.5">Age / Sex</th>
-                  <th className="p-3.5">Language</th>
-                  <th className="p-3.5">Clinical / Triage Status</th>
+                  <th className="p-3.5">Role</th>
+                  <th className="p-3.5">Email / Account</th>
+                  <th className="p-3.5">Demographics</th>
+                  <th className="p-3.5">Status</th>
+                  <th className="p-3.5">Clinical / Triage</th>
                   <th className="p-3.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {patients
-                  .filter((p) => {
-                    if (filterRole === "patient") return p.role === "participant";
-                    if (filterRole === "clinician") return p.role === "clinician";
-                    if (filterRole === "director") return p.role === "director";
-                    return true;
-                  })
-                  .map((p) => {
+                {paginatedUsers.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="p-8 text-center text-slate-400">
+                      No records found matching "{searchQuery}".
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedUsers.map((p) => {
                     const isDoctor = p.role === "clinician" || p.name.startsWith("Dr.");
                     const isDirector = p.role === "director";
+                    const isAdm = p.role === "admin";
+                    const scalableId = formatScalableId(p.id, p.role);
+                    const isActive = p.is_active !== false;
+
                     return (
-                      <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                      <tr
+                        key={p.id}
+                        className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition ${
+                          !isActive ? "opacity-60 bg-slate-50/30 dark:bg-slate-900/40" : ""
+                        }`}
+                      >
+                        {/* Scalable System ID */}
+                        <td className="p-3.5">
+                          <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 tracking-wider">
+                            {scalableId}
+                          </span>
+                        </td>
+
+                        {/* Name */}
                         <td className="p-3.5 font-semibold text-slate-900 dark:text-white">
                           <div className="flex items-center gap-2">
                             {isDoctor ? (
                               <Stethoscope className="w-3.5 h-3.5 text-sky-600 shrink-0" />
                             ) : isDirector ? (
                               <Hospital className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                            ) : isAdm ? (
+                              <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                             ) : (
                               <User className="w-3.5 h-3.5 text-teal-600 shrink-0" />
                             )}
-                            <span>{p.name}</span>
+                            <span className={!isActive ? "line-through text-slate-500" : ""}>
+                              {p.name}
+                            </span>
                           </div>
                         </td>
+
+                        {/* Assigned Role */}
                         <td className="p-3.5">
                           <span
                             className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
@@ -349,21 +606,41 @@ export default function AdminPage() {
                                 ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
                                 : p.role === "admin"
                                 ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300"
+                                : p.role === "receptionist"
+                                ? "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300"
                                 : "bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300"
                             }`}
                           >
                             {p.role === "participant" ? "Patient" : p.role}
                           </span>
                         </td>
+
+                        {/* Email */}
                         <td className="p-3.5 text-slate-600 dark:text-slate-400 font-mono text-[11px]">
                           {p.email || p.id}
                         </td>
-                        <td className="p-3.5 text-slate-600 dark:text-slate-400">
-                          {p.age}y / {p.sex}
+
+                        {/* Demographics */}
+                        <td className="p-3.5 text-slate-600 dark:text-slate-400 text-[11px]">
+                          {p.age}y • {p.sex} • <span className="uppercase font-semibold">{p.language}</span>
                         </td>
-                        <td className="p-3.5 uppercase text-slate-600 dark:text-slate-400 font-medium">
-                          {p.language}
+
+                        {/* Account Status */}
+                        <td className="p-3.5">
+                          {isActive ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                              Active
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                              Deactivated
+                            </span>
+                          )}
                         </td>
+
+                        {/* Clinical / Triage */}
                         <td className="p-3.5">
                           {p.role === "participant" ? (
                             <span
@@ -382,25 +659,97 @@ export default function AdminPage() {
                               {p.latest_triage_color}
                             </span>
                           ) : (
-                            <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                              <CheckCircle className="w-3 h-3 text-emerald-600" />
-                              Active Staff
-                            </span>
+                            <span className="text-[10px] text-slate-400 font-medium">—</span>
                           )}
                         </td>
+
+                        {/* Actions */}
                         <td className="p-3.5 text-right">
-                          <button
-                            onClick={() => handleInspectPatient(p)}
-                            className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 text-xs font-medium transition shadow-2xs"
-                          >
-                            Audit Profile
-                          </button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            {/* Audit / Inspect */}
+                            <button
+                              onClick={() => handleInspectPatient(p)}
+                              className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 text-xs font-medium transition shadow-2xs"
+                            >
+                              Audit
+                            </button>
+
+                            {/* Deactivate / Reactivate Toggle */}
+                            <button
+                              onClick={() => handleToggleDeactivate(p)}
+                              title={isActive ? `Deactivate ${p.name}` : `Reactivate ${p.name}`}
+                              className={`p-1.5 rounded-lg border transition ${
+                                isActive
+                                  ? "border-amber-200 dark:border-amber-900/60 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+                                  : "border-emerald-200 dark:border-emerald-900/60 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                              }`}
+                            >
+                              {isActive ? <PowerOff className="w-3.5 h-3.5" /> : <Power className="w-3.5 h-3.5" />}
+                            </button>
+
+                            {/* Delete Permanently */}
+                            <button
+                              onClick={() => setUserToDelete(p)}
+                              title={`Delete ${p.name}`}
+                              className="p-1.5 rounded-lg border border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
-                  })}
+                  })
+                )}
               </tbody>
             </table>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="p-3.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850 flex items-center justify-between text-xs text-slate-500">
+                <div>
+                  Showing Page <span className="font-bold text-slate-800 dark:text-slate-200">{currentPageSafe}</span> of <span className="font-bold text-slate-800 dark:text-slate-200">{totalPages}</span> ({filteredUsers.length} total filtered results)
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    disabled={currentPageSafe <= 1}
+                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum = i + 1;
+                    if (totalPages > 5 && currentPageSafe > 3) {
+                      pageNum = Math.min(totalPages - 4 + i, currentPageSafe - 2 + i);
+                    }
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-7 h-7 rounded-lg text-xs font-semibold transition ${
+                          currentPageSafe === pageNum
+                            ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+                            : "border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100"
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+
+                  <button
+                    disabled={currentPageSafe >= totalPages}
+                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -972,6 +1321,213 @@ export default function AdminPage() {
                 Close Audit Record
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Delete User Confirmation Modal */}
+      {userToDelete && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 flex items-center justify-center shrink-0">
+                <AlertOctagon className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Delete User Account?
+                </h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Are you sure you want to permanently remove <span className="font-semibold text-slate-900 dark:text-white">"{userToDelete.name}"</span> ({userToDelete.id})? This will delete associated clinical logs, sessions, and triage history.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 dark:bg-slate-850 rounded-xl text-xs space-y-1 border border-slate-200 dark:border-slate-800">
+              <div className="flex justify-between text-slate-500">
+                <span>Role:</span>
+                <span className="font-semibold capitalize text-slate-800 dark:text-slate-200">{userToDelete.role}</span>
+              </div>
+              <div className="flex justify-between text-slate-500">
+                <span>Email:</span>
+                <span className="font-mono text-slate-800 dark:text-slate-200">{userToDelete.email || "N/A"}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setUserToDelete(null)}
+                disabled={deletingUser}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteUser}
+                disabled={deletingUser}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-2xs"
+              >
+                {deletingUser ? "Deleting..." : "Permanently Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add User Modal */}
+      {showAddUserModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 flex items-center justify-center">
+                  <UserPlus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Add New Platform User
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Register a patient, clinician, hospital director, or administrator.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAddUserModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {addUserError && (
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs text-rose-800 dark:text-rose-200">
+                {addUserError}
+              </div>
+            )}
+
+            <form onSubmit={handleCreateUser} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newUserName}
+                    onChange={(e) => setNewUserName(e.target.value)}
+                    placeholder="e.g. Dr. Humaid Al-Dhaheri or Mariam Mansoor"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-600"
+                  />
+                </div>
+
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={newUserEmail}
+                    onChange={(e) => setNewUserEmail(e.target.value)}
+                    placeholder="name@doh.gov.ae or patient@ae"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-600"
+                  />
+                </div>
+
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Initial Password
+                  </label>
+                  <input
+                    type="text"
+                    value={newUserPassword}
+                    onChange={(e) => setNewUserPassword(e.target.value)}
+                    placeholder="password123"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-600"
+                  />
+                </div>
+
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    System Role
+                  </label>
+                  <select
+                    value={newUserRole}
+                    onChange={(e) => setNewUserRole(e.target.value as any)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-600"
+                  >
+                    <option value="participant">Patient / Participant</option>
+                    <option value="clinician">Licensed Clinician (Doctor)</option>
+                    <option value="director">Hospital Medical Director</option>
+                    <option value="receptionist">Reception / Intake Desk</option>
+                    <option value="admin">Root System Administrator</option>
+                  </select>
+                </div>
+
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Age
+                  </label>
+                  <input
+                    type="number"
+                    min={18}
+                    max={100}
+                    value={newUserAge}
+                    onChange={(e) => setNewUserAge(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-600"
+                  />
+                </div>
+
+                <div className="col-span-1">
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Sex
+                  </label>
+                  <select
+                    value={newUserSex}
+                    onChange={(e) => setNewUserSex(e.target.value as any)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-600"
+                  >
+                    <option value="F">Female</option>
+                    <option value="M">Male</option>
+                  </select>
+                </div>
+
+                <div className="col-span-1">
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Language
+                  </label>
+                  <select
+                    value={newUserLang}
+                    onChange={(e) => setNewUserLang(e.target.value as any)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-600"
+                  >
+                    <option value="ar">Arabic (العربية)</option>
+                    <option value="en">English</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowAddUserModal(false)}
+                  disabled={addingUser}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={addingUser}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-semibold transition shadow-2xs"
+                >
+                  {addingUser ? "Registering..." : "Create Account"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

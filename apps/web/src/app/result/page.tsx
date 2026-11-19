@@ -335,7 +335,7 @@ export default function ResultPage() {
 
       {/* Longitudinal Trajectory Graph for Patient */}
       {trendData && trendData.sessions && trendData.sessions.length > 0 && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-3 shadow-2xs">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-2xs">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -363,7 +363,7 @@ export default function ResultPage() {
                     {sess.is_practice ? "Practice" : `Session ${sess.session_number}`}
                   </span>
                   <span className="text-base font-black text-slate-900 dark:text-white block">
-                    {memScore > 0 ? `${memScore}%` : "—"}
+                    {memScore > 0 ? `${memScore}` : "—"}
                   </span>
                   <span
                     className={`inline-block text-[9px] font-bold px-1.5 py-0.5 rounded ${
@@ -379,6 +379,57 @@ export default function ResultPage() {
                 </div>
               );
             })}
+          </div>
+
+          {/* Detailed Previous Check-ins & Clinical Appointments History */}
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+            <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-teal-600" />
+              <span>Past Check-Ins & Assessment Records ({trendData.sessions.length})</span>
+            </h4>
+            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+              {trendData.sessions.map((s, idx) => (
+                <div
+                  key={idx}
+                  className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-850/50 flex flex-wrap items-center justify-between gap-3 text-xs"
+                >
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-900 dark:text-white">
+                        {s.is_practice ? "Baseline Calibration Practice" : `Assessment Check-In #${s.session_number}`}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
+                        s.triage_color === "green"
+                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                          : s.triage_color === "yellow"
+                          ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                          : "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300"
+                      }`}>
+                        {s.triage_color}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 flex items-center gap-2">
+                      <Clock className="w-3 h-3 text-slate-400" />
+                      <span>{new Date(s.completed_at).toLocaleDateString()} at {new Date(s.completed_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                      <span>•</span>
+                      <span>Attending: {data.attending_clinician_name || "Assigned Specialist"}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                    <span className="px-2 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                      Memory: <strong className="text-slate-900 dark:text-white">{s.scores?.memory ?? "—"}</strong>
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                      Seq Audio-Visual: <strong className="text-slate-900 dark:text-white">{s.scores?.sequence_av ?? "—"}</strong>
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                      Reaction: <strong className="text-slate-900 dark:text-white">{s.scores?.attention_rt ?? "—"} ms</strong>
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
