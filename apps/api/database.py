@@ -7,7 +7,9 @@ from sqlalchemy import event
 from sqlmodel import SQLModel, create_engine, Session
 
 # DB path configurable via environment variable or default to local sqlite
-DB_PATH = os.getenv("DATABASE_URL", "sqlite:///brainbaseline.db")
+# On Vercel / AWS Lambda, the root filesystem is read-only; /tmp is the only writable directory
+default_sqlite = "sqlite:////tmp/brainbaseline.db" if os.environ.get("VERCEL") else "sqlite:///brainbaseline.db"
+DB_PATH = os.getenv("DATABASE_URL", default_sqlite)
 
 engine = create_engine(
     DB_PATH,

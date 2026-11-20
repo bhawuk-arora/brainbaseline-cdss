@@ -79,6 +79,12 @@ async def lifespan(app: FastAPI):
     init_db()
     with Session(engine) as session:
         seed_demo_data(session)
+        # Ensure 100 cohort patients and staff are seeded on first spin-up
+        try:
+            from .seed_patients import generate_patients
+            generate_patients(100)
+        except Exception as e:
+            print("Note: Seed patients initialization:", e)
     yield
 
 
